@@ -1,0 +1,344 @@
+<Window x:Class="ClipAssist.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:ClipAssist.Controls"
+        Title="ClipAssist"
+        Width="720" Height="520"
+        MinWidth="520" MinHeight="380"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        FontFamily="{StaticResource AppFontFamily}"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <!-- DataContext 由 App.OnStartup 注入：M2 起 ViewModel 需要 ClipboardHistory
+         和 ClipboardService 两个依赖，不再适合在 XAML 里无参实例化。 -->
+
+    <Grid Margin="20,18,20,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ============ 标题区 ============ -->
+        <Grid Grid.Row="0" Margin="2,0,2,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Border Width="32" Height="32" CornerRadius="8" Background="{DynamicResource AccentBrush}">
+                <TextBlock Text="&#xE77F;"
+                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                           FontSize="16"
+                           Foreground="{DynamicResource AccentForegroundBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+
+            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="ClipAssist"
+                           FontSize="17"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                <TextBlock Text="剪贴板历史助手"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="0,2,0,0" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="12,0,0,0">
+                <Button Content="浮窗"
+                        Click="OnFloatingModeClick"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        MinWidth="64"
+                        Margin="0,0,8,0"
+                        ToolTip="浮窗模式（始终置顶）"
+                        AutomationProperties.AutomationId="OpenFloatingMode"
+                        AutomationProperties.Name="浮窗模式" />
+                <Button Content="设置"
+                        Click="OnSettingsClick"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        MinWidth="64" />
+            </StackPanel>
+        </Grid>
+
+        <!-- ============ 搜索框 ============ -->
+        <Border Grid.Row="1"
+                Height="38"
+                Margin="0,0,0,12"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+            <Grid Margin="10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="&#xE721;"
+                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                           FontSize="14"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center" />
+
+                <Grid Grid.Column="1" Margin="8,0,0,0">
+                    <TextBox x:Name="SearchBox"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ThemeTextBoxStyle}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             FontSize="13"
+                             VerticalContentAlignment="Center"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             CaretBrush="{DynamicResource TextPrimaryBrush}"
+                             AutomationProperties.AutomationId="SearchBox"
+                             AutomationProperties.Name="搜索历史记录" />
+
+                    <!-- 占位提示：SearchText 为空时显示，有输入就隐藏 -->
+                    <TextBlock Text="搜索历史记录…"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SearchText}" Value="">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- ============ 历史列表 ============ -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="6">
+            <Grid>
+                <ListBox x:Name="HistoryList"
+                         ItemsSource="{Binding Items}"
+                         SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                         SelectionMode="{Binding ListSelectionMode}"
+                         SelectionChanged="OnHistorySelectionChanged"
+                         Style="{StaticResource HistoryListBoxStyle}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <!-- 双击只加在列表项上：单击选中仍由 ListBox 自己处理；
+                         ItemContainerStyle 里不重复挂其他双击处理器，保证一次手势只复制一次。 -->
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem"
+                               BasedOn="{StaticResource HistoryItemStyle}">
+                            <EventSetter Event="MouseDoubleClick"
+                                         Handler="OnHistoryItemMouseDoubleClick" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0"
+                                          Margin="0,0,8,0"
+                                          VerticalAlignment="Center"
+                                          IsTabStop="False"
+                                          IsChecked="{Binding IsSelected,
+                                                              RelativeSource={RelativeSource AncestorType=ListBoxItem},
+                                                              Mode=TwoWay}">
+                                    <CheckBox.Style>
+                                        <Style TargetType="CheckBox"
+                                               BasedOn="{StaticResource ThemeCheckBoxStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsSelectionMode,
+                                                                               RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                             Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
+
+                                <controls:HighlightTextBlock Grid.Column="1"
+                                                            SourceText="{Binding Preview}"
+                                                            SearchText="{Binding DataContext.SearchText,
+                                                                                 RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                            HighlightBrush="{DynamicResource SearchHighlightBrush}"
+                                                            FontSize="13"
+                                                            Foreground="{DynamicResource TextPrimaryBrush}"
+                                                            TextTrimming="CharacterEllipsis"
+                                                            TextWrapping="NoWrap"
+                                                            VerticalAlignment="Center"
+                                                            ToolTip="{Binding Text}" />
+
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding TimeText}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="12,0,2,0"
+                                           VerticalAlignment="Center" />
+
+                                <Button Grid.Column="3"
+                                        Content="删除"
+                                        FontSize="11"
+                                        Width="42"
+                                        Height="24"
+                                        Padding="4,0"
+                                        Margin="6,0,0,0"
+                                        Command="{Binding DataContext.DeleteEntryCommand,
+                                                          RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="删除这条记录"
+                                        AutomationProperties.AutomationId="DeleteHistoryEntry"
+                                        AutomationProperties.Name="删除这条记录">
+                                    <Button.Style>
+                                        <Style TargetType="Button"
+                                               BasedOn="{StaticResource DangerButtonStyle}">
+                                            <!-- 用 Opacity 而不是 Collapsed：按钮始终参与布局，
+                                                 显隐不会改变时间列位置或列表滚动范围。
+                                                 保留键盘焦点，Tab 到按钮时也显示。 -->
+                                            <Setter Property="Opacity" Value="0" />
+                                            <Setter Property="IsHitTestVisible" Value="False" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver,
+                                                                               RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                             Value="True">
+                                                    <Setter Property="Opacity" Value="1" />
+                                                    <Setter Property="IsHitTestVisible" Value="True" />
+                                                </DataTrigger>
+                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                    <Setter Property="Opacity" Value="1" />
+                                                    <Setter Property="IsHitTestVisible" Value="True" />
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- 空状态提示：列表没有内容时盖在中间 -->
+                <TextBlock Text="{Binding EmptyHintText}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           IsHitTestVisible="False"
+                           Visibility="{Binding IsListEmpty, Converter={StaticResource BooleanToVisibility}}" />
+            </Grid>
+        </Border>
+
+        <!-- ============ 多选操作栏（仅多选模式显示） ============ -->
+        <Border Grid.Row="3"
+                Margin="0,10,0,0"
+                Padding="8,6"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource DividerBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Visibility="{Binding IsSelectionMode, Converter={StaticResource BooleanToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding SelectionCountText}"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="2,0,8,0" />
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="全选当前"
+                            Click="OnSelectAllVisibleClick"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Padding="8,4"
+                            MinWidth="70"
+                            Margin="0,0,6,0"
+                            ToolTip="只选择当前搜索结果显示的记录"
+                            AutomationProperties.AutomationId="SelectAllVisible"
+                            AutomationProperties.Name="全选当前显示记录" />
+                    <Button Content="取消选择"
+                            Click="OnClearSelectionClick"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Padding="8,4"
+                            MinWidth="70"
+                            Margin="0,0,6,0"
+                            AutomationProperties.AutomationId="ClearSelection"
+                            AutomationProperties.Name="取消全部选择" />
+                    <Button Content="删除选中"
+                            Command="{Binding BatchDeleteCommand}"
+                            Style="{StaticResource DangerButtonStyle}"
+                            Padding="8,4"
+                            MinWidth="76"
+                            AutomationProperties.AutomationId="BatchDelete"
+                            AutomationProperties.Name="批量删除选中记录" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 底部操作栏 ============ -->
+        <Grid Grid.Row="4" Margin="2,12,2,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="{Binding StatusText}"
+                       FontSize="11"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="0,0,12,0" />
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="{Binding SelectionModeButtonText}"
+                        Click="OnToggleSelectionModeClick"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        MinWidth="76"
+                        Margin="0,0,8,0"
+                        ToolTip="进入或退出多选模式"
+                        AutomationProperties.AutomationId="ToggleSelectionMode"
+                        AutomationProperties.Name="多选模式" />
+                <Button Content="复制"
+                        Command="{Binding CopyCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        MinWidth="72" />
+                <Button Content="清空历史"
+                        Command="{Binding ClearCommand}"
+                        Style="{StaticResource DangerButtonStyle}"
+                        MinWidth="84"
+                        Margin="8,0,0,0" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
