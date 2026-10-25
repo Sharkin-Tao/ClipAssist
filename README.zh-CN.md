@@ -1,4 +1,9 @@
 # ClipAssist
+# ClipAssist
+
+[English](README.md) | **简体中文**
+
+ClipAssist 是一款面向 Windows 11 的轻量级剪贴板历史管理工具，使用 C#、WPF 和 .NET 开发。
 
 ClipAssist 是一款面向 Windows 11 的轻量级剪贴板历史管理工具，使用 C#、WPF 和 .NET 开发，旨在让剪贴板历史的查看、搜索和管理更加方便。
 
