@@ -155,6 +155,7 @@ public sealed class StartupService
         var command = BuildCommand(executablePath);
         StartupRegistryValue? previous = null;
         var writeAttempted = false;
+        var stage = "read-before-write";
 
         try
         {
@@ -172,9 +173,11 @@ public sealed class StartupService
                         "启动项已存在，但回读状态不一致。");
             }
 
+            stage = "write";
             writeAttempted = true;
             _registry.Write(_valueName, command, RegistryValueKind.String);
 
+            stage = "read-after-write";
             var written = _registry.Read(_valueName);
             if (written?.Value is not string writtenCommand ||
                 !string.Equals(writtenCommand, command, StringComparison.Ordinal))
@@ -186,6 +189,7 @@ public sealed class StartupService
                     "写入开机启动项后回读不一致，已恢复原状态。");
             }
 
+            stage = "status-after-write";
             var status = GetStatus();
             if (!status.IsEnabled)
             {
@@ -207,7 +211,7 @@ public sealed class StartupService
             return new StartupChangeResult(
                 false,
                 GetStatus(),
-                DescribeChangeFailure("开启开机自启动", ex));
+                DescribeChangeFailure("开启开机自启动", ex, stage));
         }
     }
 
@@ -242,7 +246,7 @@ public sealed class StartupService
             return new StartupChangeResult(
                 false,
                 GetStatus(),
-                DescribeChangeFailure("关闭开机自启动", ex));
+                DescribeChangeFailure("关闭开机自启动", ex, "delete"));
         }
     }
 
@@ -428,13 +432,38 @@ public sealed class StartupService
 
     private static string DescribeReadFailure(Exception exception) =>
         exception is UnauthorizedAccessException or SecurityException
-            ? "无法读取开机启动项：Windows 拒绝访问。当前程序可能运行在受限终端、沙箱或低权限环境中；请从桌面或开始菜单以普通用户身份启动 ClipAssist。"
+            ? "无法读取开机启动项：Windows 拒绝访问"
+              + $"（错误码 0x{exception.HResult:X8}）。"
+              + "当前程序可能运行在受限终端、沙箱或低权限环境中。"
+              + "如果程序所在文件夹带有“低完整性”标签（常见于从压缩包或网络位置解压的目录），"
+              + "请将整个程序文件夹复制到普通本地目录后重新启动 ClipAssist。"
             : $"无法读取开机启动项：{exception.Message}";
 
-    private static string DescribeChangeFailure(string action, Exception exception) =>
-        exception is UnauthorizedAccessException or SecurityException
-            ? $"{action}失败：Windows 拒绝写入当前用户的启动项。当前程序可能运行在受限终端、沙箱或低权限环境中；请关闭 ClipAssist，从桌面或开始菜单以普通用户身份重新启动后再试。"
-            : $"{action}失败：{exception.Message}";
+    private static string DescribeChangeFailure(
+        string action,
+        Exception exception,
+        string stage)
+    {
+        if (exception is not (UnauthorizedAccessException or SecurityException))
+        {
+            return $"{action}失败：{exception.Message}";
+        }
+
+        var operation = stage switch
+        {
+            "read-before-write" => "读取",
+            "read-after-write" or "status-after-write" => "验证",
+            "delete" => "删除",
+            _ => "写入",
+        };
+
+        return $"{action}失败：Windows 拒绝{operation}当前用户的启动项"
+            + $"（HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run，"
+            + $"错误码 0x{exception.HResult:X8}）。"
+            + "当前程序可能运行在受限终端、沙箱或低权限环境中。"
+            + "如果程序所在文件夹带有“低完整性”标签（常见于从压缩包或网络位置解压的目录），"
+            + "请将整个程序文件夹复制到普通本地目录后重新启动再试。";
+    }
 
     private static bool IsRegistryFailure(Exception exception) =>
         exception is SecurityException
@@ -467,7 +496,10 @@ public sealed class StartupService
 
         public void Write(string valueName, object value, RegistryValueKind kind)
         {
-            using var key = Registry.CurrentUser.CreateSubKey(DefaultRunKeyPath, writable: true)
+            // Run 键通常已存在。优先以只请求写值权限的方式打开，避免不必要的
+            // CreateSubKey 权限要求；只有键确实不存在时才创建。
+            using var key = Registry.CurrentUser.OpenSubKey(DefaultRunKeyPath, writable: true)
+                ?? Registry.CurrentUser.CreateSubKey(DefaultRunKeyPath, writable: true)
                 ?? throw new InvalidOperationException("无法打开当前用户的开机启动项注册表位置。");
 
             key.SetValue(valueName, value, kind);

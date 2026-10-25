@@ -2160,6 +2160,14 @@ void TestStartupRegistration()
             && readFailure.Message?.Contains("受限", StringComparison.Ordinal) == true,
         readFailure.Message ?? "(null)");
 
+    var enableReadFailureRegistry = new InMemoryStartupRegistry { FailReads = true };
+    var enableReadFailure = new StartupService(currentExe, valueName, enableReadFailureRegistry).Enable();
+    Check(
+        "开启时读取失败不误报为写入失败",
+        !enableReadFailure.Success
+            && enableReadFailure.Error?.Contains("读取", StringComparison.Ordinal) == true,
+        enableReadFailure.Error ?? "(null)");
+
     Check(
         "设置和历史文件未被启动项操作修改",
         File.ReadAllText(Path.Combine(startupDirectory, "settings.json")) == "settings-sentinel"
