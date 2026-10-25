@@ -10,7 +10,6 @@ ClipAssist is under active development. Features and behavior may change as the 
 
 ## Screenshots
 
-![ClipAssist Main Window](mainwindow.png)
 ![ClipAssist Main Window](smallwindows.png)
 
 ## Features
