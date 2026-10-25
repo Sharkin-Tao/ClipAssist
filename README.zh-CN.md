@@ -10,7 +10,6 @@ ClipAssist 目前正在积极开发中。随着项目不断完善，功能和使
 
 ## 截屏
 
-![ClipAssist Main Window](mainwindows.png)
 ![ClipAssist Main Window](smallwindows.png)
 
 ## 功能特性
