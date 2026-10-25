@@ -8,6 +8,12 @@ ClipAssist is a lightweight clipboard history utility for Windows 11, built with
 
 ClipAssist is under active development. Features and behavior may change as the project evolves.
 
+## Screenshots
+
+![ClipAssist Main Window](mainwindows.png)
+![ClipAssist Main Window](smallwindows.png)
+![ClipAssist Main Window](settingwindows.png)
+
 ## Features
 
 - **Clipboard History** — Keep track of recently copied text.
