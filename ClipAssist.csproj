@@ -15,10 +15,10 @@
     <!-- WFO0003 是 WinForms 分析器的建议；本项目是 WPF，DPI 感知必须在进程启动前
          由 app.manifest 声明，不能等到 Application.SetHighDpiMode。 -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
-    <Version>0.1.0</Version>
-    <AssemblyVersion>0.1.0.0</AssemblyVersion>
-    <FileVersion>0.1.0.0</FileVersion>
-    <InformationalVersion>0.1.0</InformationalVersion>
+    <Version>0.1.1</Version>
+    <AssemblyVersion>0.1.1.0</AssemblyVersion>
+    <FileVersion>0.1.1.0</FileVersion>
+    <InformationalVersion>0.1.1</InformationalVersion>
     <Product>ClipAssist</Product>
     <AssemblyTitle>ClipAssist</AssemblyTitle>
   </PropertyGroup>

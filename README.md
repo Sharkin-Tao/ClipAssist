@@ -2,7 +2,6 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-ClipAssist is a lightweight clipboard history utility for Windows 11, built with C#, WPF, and .NET.
 ClipAssist is a lightweight clipboard history utility for Windows 11, built with C#, WPF, and .NET. It is designed to make accessing, searching, and managing clipboard history more convenient.
 
 ## Project Status
@@ -72,4 +71,4 @@ See the [LICENSE](LICENSE) file for the applicable license terms. All rights are
 
 ## Acknowledgments
 
-Thanks to everyone who provides feedback and helps improve ClipAssist.# ClipAssist
+Thanks to everyone who provides feedback and helps improve ClipAssist.

@@ -1,6 +1,6 @@
 # ClipAssist 第三方组件与声明
 
-ClipAssist 0.1.0 使用或随附以下第三方组件。各组件适用其自身许可证；本文件不改变这些许可证。
+ClipAssist 0.1.1 使用或随附以下第三方组件。各组件适用其自身许可证；本文件不改变这些许可证。
 
 ## 1. .NET 10、WPF 和 Windows Forms
 
@@ -23,7 +23,7 @@ Copyright (c) .NET Foundation and Contributors.
 Copyright (C) 1997-2026 Jordan Russell. All rights reserved.
 Portions Copyright (C) 2000-2026 Martijn Laan. All rights reserved.
 
-当前 ClipAssist 0.1.0 按非商业用途发布。Inno Setup 的版权和许可声明适用于安装包中的安装器引擎。
+当前 ClipAssist 0.1.1 按非商业用途发布。Inno Setup 的版权和许可声明适用于安装包中的安装器引擎。
 
 ## 3. Inno Setup 简体中文翻译
 

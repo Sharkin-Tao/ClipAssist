@@ -1,17 +1,17 @@
 #define MyAppName "ClipAssist"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.1.1"
 #define MyAppExeName "ClipAssist.exe"
-#define MyReleaseDir "E:\ClipAssist-Release\v0.1.0"
-#define MyOutputDir "E:\ClipAssist-Release"
-#define MyProjectDir "E:\deepseekfile\ClipAssist"
+#define MyReleaseDir "E:\ClipAssist-Release\v0.1.1\app"
+#define MyOutputDir "E:\ClipAssist-Release\v0.1.1"
+#define MyProjectDir "E:\ClipAssist-v0.1\ClipAssist"
 
 [Setup]
 AppId={{6E7D4D89-2C0F-4F45-9B51-8F63B6D72A11}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
-VersionInfoVersion=0.1.0.0
-VersionInfoProductVersion=0.1.0
+VersionInfoVersion=0.1.1.0
+VersionInfoProductVersion=0.1.1
 VersionInfoCompany=ClipAssist
 VersionInfoCopyright=Copyright (C) 2026 ClipAssist. All rights reserved.
 VersionInfoDescription=ClipAssist Setup
@@ -22,11 +22,11 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#MyOutputDir}
-OutputBaseFilename=ClipAssist-0.1.0-win-x64-setup
+OutputBaseFilename=ClipAssist-0.1.1-win-x64-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-SetupIconFile=E:\deepseekfile\ClipAssist\Assets\ClipAssist.ico
+SetupIconFile={#MyProjectDir}\Assets\ClipAssist.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 AppCopyright=Copyright (C) 2026 ClipAssist. All rights reserved.
@@ -44,6 +44,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#MyReleaseDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MyProjectDir}\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MyProjectDir}\README.zh-CN.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyProjectDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyProjectDir}\PRIVACY.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyProjectDir}\THIRD-PARTY-NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
