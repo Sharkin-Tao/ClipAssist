@@ -11,6 +11,7 @@ ClipAssist 目前正在积极开发中。随着项目不断完善，功能和使
 ## 截屏
 
 ![ClipAssist Main Window](smallwindows.png)
+
 这是浮窗模式
 
 ## 功能特性
