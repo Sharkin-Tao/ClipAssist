@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using ClipAssist.Models;
 
@@ -16,14 +17,22 @@ public partial class FloatingWindow : Window
     /// <summary>请求打开或唤起原有的完整主窗口，由 App 统一处理窗口生命周期。</summary>
     public event EventHandler? ExpandRequested;
 
+    private const int WmSysCommand = 0x0112;
+    private const int ScMinimize = 0xF020;
+
     private Point _dragStartPoint;
     private ClipboardEntry? _dragEntry;
     private ListBoxItem? _dragSourceItem;
+    private HwndSource? _windowSource;
+    private bool _handlingMinimize;
 
     public FloatingWindow()
     {
         InitializeComponent();
         Loaded += OnLoaded;
+        SourceInitialized += OnSourceInitialized;
+        StateChanged += OnStateChanged;
+        Closed += OnClosed;
     }
 
     /// <summary>
@@ -141,6 +150,63 @@ public partial class FloatingWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         FocusSearchBox();
+    }
+
+    /// <summary>
+    /// 浮窗没有任务栏按钮。直接最小化时 Windows 会把一个很小的窗口标题条
+    /// 留在屏幕左下角，形成可见残留。因此浮窗的“最小化”按设计改为隐藏，
+    /// 由原来的快捷键、托盘或主窗口入口通过 ShowAndFocus 再次显示。
+    /// </summary>
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        _windowSource = PresentationSource.FromVisual(this) as HwndSource;
+        _windowSource?.AddHook(OnWindowMessage);
+    }
+
+    private IntPtr OnWindowMessage(
+        IntPtr hwnd,
+        int message,
+        IntPtr wParam,
+        IntPtr lParam,
+        ref bool handled)
+    {
+        if (message == WmSysCommand &&
+            (wParam.ToInt32() & 0xFFF0) == ScMinimize)
+        {
+            handled = true;
+            Hide();
+        }
+
+        return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// 兜底处理通过代码或辅助功能接口触发的最小化，避免绕过标题栏命令时
+    /// 仍留下左下角残留。先恢复正常状态再隐藏，保证下次 Show 时尺寸和位置正常。
+    /// </summary>
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        if (_handlingMinimize || WindowState != WindowState.Minimized)
+        {
+            return;
+        }
+
+        _handlingMinimize = true;
+        try
+        {
+            WindowState = WindowState.Normal;
+            Hide();
+        }
+        finally
+        {
+            _handlingMinimize = false;
+        }
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        _windowSource?.RemoveHook(OnWindowMessage);
+        _windowSource = null;
     }
 
     private void FocusSearchBox()
