@@ -8,6 +8,12 @@ ClipAssist 是一款面向 Windows 11 的轻量级剪贴板历史管理工具，
 
 ClipAssist 目前正在积极开发中。随着项目不断完善，功能和使用方式可能会发生变化。
 
+## 截屏
+
+![ClipAssist Main Window](mainwindows.png)
+![ClipAssist Main Window](smallwindows.png)
+![ClipAssist Main Window](settingwindows.png)
+
 ## 功能特性
 
 - **剪贴板历史记录** — 记录近期复制的文本内容。
