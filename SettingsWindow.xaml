@@ -1,7 +1,8 @@
 <Window x:Class="ClipAssist.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="设置"
+        xmlns:loc="clr-namespace:ClipAssist.Localization"
+        Title="{loc:Loc Settings.Title}"
         Width="460"
         SizeToContent="Height"
         MinHeight="300"
@@ -26,10 +27,31 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
-            <TextBlock Text="外观"
+            <TextBlock Text="{loc:Loc Settings.Language}"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <ComboBox x:Name="LanguageSelector"
+                      Width="180"
+                      Margin="0,8,0,0"
+                      HorizontalAlignment="Left"
+                      Style="{StaticResource ThemeComboBoxStyle}"
+                      SelectionChanged="OnLanguageSelectionChanged"
+                      AutomationProperties.AutomationId="LanguageSelector"
+                      AutomationProperties.Name="{loc:Loc Settings.Language.Automation}" />
+            <TextBlock Text="{loc:Loc Settings.Language.Description}"
+                       Margin="0,7,0,0"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,18,0,0">
+            <TextBlock Text="{loc:Loc Settings.Appearance}"
                        FontSize="16"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -40,30 +62,30 @@
                       Style="{StaticResource ThemeComboBoxStyle}"
                       SelectionChanged="OnThemeSelectionChanged"
                       AutomationProperties.AutomationId="ThemeSelector"
-                      AutomationProperties.Name="主题" />
-            <TextBlock Text="主题选择会立即生效并保存；跟随系统时随 Windows 应用主题切换。"
+                      AutomationProperties.Name="{loc:Loc Settings.Theme}" />
+            <TextBlock Text="{loc:Loc Settings.ThemeHint}"
                        Margin="0,7,0,0"
                        FontSize="11"
                        TextWrapping="Wrap"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Margin="0,18,0,0">
-            <TextBlock Text="启动"
+        <StackPanel Grid.Row="2" Margin="0,18,0,0">
+            <TextBlock Text="{loc:Loc Settings.Startup}"
                        FontSize="16"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimaryBrush}" />
             <CheckBox x:Name="StartupCheckBox"
                       Margin="0,8,0,0"
-                      Content="开机自启动"
+                      Content="{loc:Loc Settings.StartupCheckbox}"
                       FontSize="13"
                       Style="{StaticResource ThemeCheckBoxStyle}"
                       Foreground="{DynamicResource TextPrimaryBrush}"
                       Checked="OnStartupOptionChanged"
                       Unchecked="OnStartupOptionChanged"
                       AutomationProperties.AutomationId="StartupWithWindows"
-                      AutomationProperties.Name="开机自启动" />
-            <TextBlock Text="开启后，登录 Windows 时自动启动 ClipAssist。"
+                      AutomationProperties.Name="{loc:Loc Settings.StartupAutomation}" />
+            <TextBlock Text="{loc:Loc Settings.StartupHint}"
                        Margin="0,7,0,0"
                        FontSize="11"
                        TextWrapping="Wrap"
@@ -76,8 +98,8 @@
                        Visibility="Collapsed" />
         </StackPanel>
 
-        <StackPanel Grid.Row="2" Margin="0,18,0,0">
-            <TextBlock Text="全局快捷键"
+        <StackPanel Grid.Row="3" Margin="0,18,0,0">
+            <TextBlock Text="{loc:Loc Settings.Hotkey}"
                        FontSize="16"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -98,8 +120,8 @@
                        Visibility="Collapsed" />
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Margin="0,18,0,0">
-            <TextBlock Text="新的快捷键"
+        <StackPanel Grid.Row="4" Margin="0,18,0,0">
+            <TextBlock Text="{loc:Loc Settings.Hotkey.New}"
                        FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
             <Button x:Name="CaptureButton"
@@ -110,20 +132,20 @@
                     Style="{StaticResource HotkeyCaptureButtonStyle}"
                     Click="OnCaptureClick"
                     AutomationProperties.AutomationId="HotkeyCapture"
-                    AutomationProperties.Name="快捷键录入">
+                    AutomationProperties.Name="{loc:Loc Settings.Hotkey.CaptureAutomation}">
                 <TextBlock x:Name="CaptureText"
                            FontSize="14"
                            Foreground="{DynamicResource TextPrimaryBrush}" />
             </Button>
-            <TextBlock Text="点击上方框后按下组合键；再次点击或按 Esc 取消录入。若组合已被其他程序占用、按键收不到，可在下方直接输入。"
+            <TextBlock Text="{loc:Loc Settings.Hotkey.Hint}"
                        Margin="0,7,0,0"
                        FontSize="11"
                        TextWrapping="Wrap"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
         </StackPanel>
 
-        <StackPanel Grid.Row="4" Margin="0,14,0,0">
-            <TextBlock Text="或手动输入"
+        <StackPanel Grid.Row="5" Margin="0,14,0,0">
+            <TextBlock Text="{loc:Loc Settings.Hotkey.Manual}"
                        FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
             <Grid Margin="0,6,0,0">
@@ -143,10 +165,10 @@
                          BorderThickness="1"
                          KeyDown="OnManualKeyDown"
                          AutomationProperties.AutomationId="HotkeyManualInput"
-                         AutomationProperties.Name="手动输入快捷键" />
+                         AutomationProperties.Name="{loc:Loc Settings.Hotkey.ManualAutomation}" />
                 <Button x:Name="ApplyManualButton"
                         Grid.Column="1"
-                        Content="应用"
+                        Content="{loc:Loc Settings.Hotkey.Apply}"
                         Margin="8,0,0,0"
                         MinWidth="56"
                         Style="{StaticResource SecondaryButtonStyle}"
@@ -156,21 +178,21 @@
         </StackPanel>
 
         <CheckBox x:Name="SelectSearchTextCheckBox"
-                  Grid.Row="5"
+                  Grid.Row="6"
                   Margin="0,16,0,0"
-                  Content="呼出窗口时全选搜索框已有文字"
+                  Content="{loc:Loc Settings.SelectSearchText}"
                   FontSize="12"
                   Style="{StaticResource ThemeCheckBoxStyle}"
                   Foreground="{DynamicResource TextPrimaryBrush}"
                   AutomationProperties.AutomationId="SelectSearchTextOnActivate"
-                  AutomationProperties.Name="呼出时全选搜索框文字" />
+                  AutomationProperties.Name="{loc:Loc Settings.SelectSearchTextAutomation}" />
 
-        <StackPanel Grid.Row="6" Margin="0,18,0,0">
-            <TextBlock Text="数据存储"
+        <StackPanel Grid.Row="7" Margin="0,18,0,0">
+            <TextBlock Text="{loc:Loc Settings.Data}"
                        FontSize="16"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimaryBrush}" />
-            <TextBlock Text="当前数据目录"
+            <TextBlock Text="{loc:Loc Settings.Data.Current}"
                        Margin="0,8,0,0"
                        FontSize="12"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -191,16 +213,16 @@
                          BorderBrush="{DynamicResource DividerBrush}"
                          BorderThickness="1"
                          AutomationProperties.AutomationId="DataDirectoryPath"
-                         AutomationProperties.Name="当前数据目录" />
+                         AutomationProperties.Name="{loc:Loc Settings.Data.CurrentAutomation}" />
                 <Button x:Name="StorageChangeButton"
                         Grid.Column="1"
-                        Content="更改…"
+                        Content="{loc:Loc Settings.Data.Change}"
                         Margin="8,0,0,0"
                         MinWidth="72"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Click="OnStorageClick"
                         AutomationProperties.AutomationId="ChangeDataDirectory"
-                        AutomationProperties.Name="更改数据目录" />
+                        AutomationProperties.Name="{loc:Loc Settings.Data.ChangeAutomation}" />
             </Grid>
             <TextBlock x:Name="StorageHintText"
                        Margin="0,7,0,0"
@@ -210,21 +232,21 @@
         </StackPanel>
 
         <TextBlock x:Name="ErrorText"
-                   Grid.Row="7"
+                   Grid.Row="8"
                    Margin="0,10,0,0"
                    FontSize="12"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource DangerBrush}"
                    Visibility="Collapsed" />
 
-        <Grid Grid.Row="8" Margin="0,22,0,0">
+        <Grid Grid.Row="9" Margin="0,22,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <Button x:Name="RestoreDefaultButton"
-                    Content="恢复默认"
+                    Content="{loc:Loc Settings.RestoreDefaults}"
                     HorizontalAlignment="Left"
                     Style="{StaticResource SecondaryButtonStyle}"
                     MinWidth="84"
@@ -232,13 +254,13 @@
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button x:Name="CancelButton"
-                        Content="取消"
+                        Content="{loc:Loc Settings.Cancel}"
                         Style="{StaticResource SecondaryButtonStyle}"
                         MinWidth="72"
                         IsCancel="True"
                         Click="OnCancelClick" />
                 <Button x:Name="SaveButton"
-                        Content="保存"
+                        Content="{loc:Loc Settings.Save}"
                         Style="{StaticResource PrimaryButtonStyle}"
                         MinWidth="72"
                         Margin="8,0,0,0"

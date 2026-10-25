@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using ClipAssist.Infrastructure;
+using ClipAssist.Localization;
 
 namespace ClipAssist.Services;
 
@@ -64,7 +65,7 @@ public sealed class ClipboardStorage
 
             if (entries is null)
             {
-                return new LoadResult(Array.Empty<StoredEntry>(), "历史文件内容为空，已从空历史开始。");
+                return new LoadResult(Array.Empty<StoredEntry>(), L.Get("Storage.HistoryEmptyWarning"));
             }
 
             return new LoadResult(entries, null);
@@ -75,7 +76,7 @@ public sealed class ClipboardStorage
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return new LoadResult(Array.Empty<StoredEntry>(), $"读取历史文件失败：{ex.Message}");
+            return new LoadResult(Array.Empty<StoredEntry>(), L.Format("Storage.HistoryReadFailed", ex.Message));
         }
     }
 
@@ -109,8 +110,8 @@ public sealed class ClipboardStorage
         var backupPath = TryBackupCorruptFile();
 
         var message = backupPath is null
-            ? "历史文件格式损坏，无法解析，本次从空历史开始。"
-            : $"历史文件格式损坏，已备份为 {Path.GetFileName(backupPath)}，本次从空历史开始。";
+            ? L.Get("Storage.HistoryCorrupt")
+            : L.Format("Storage.HistoryCorruptBackup", Path.GetFileName(backupPath));
 
         return new LoadResult(Array.Empty<StoredEntry>(), message);
     }

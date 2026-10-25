@@ -1,4 +1,5 @@
 using System.IO;
+using ClipAssist.Localization;
 
 namespace ClipAssist.Infrastructure;
 
@@ -48,12 +49,12 @@ public sealed class DataLocationResolver
             if (!Directory.Exists(pointer.Directory))
             {
                 warning =
-                    $"自定义数据目录不存在：{pointer.Directory}。应用未切换到默认目录，请修复该路径后重启应用。";
+                    L.Format("Data.CustomMissing", pointer.Directory);
             }
             else if (!AppPaths.IsWritableDirectory(pointer.Directory))
             {
                 warning =
-                    $"自定义数据目录不可写：{pointer.Directory}。应用未切换到默认目录，请检查权限后重启应用。";
+                    L.Format("Data.CustomNotWritable", pointer.Directory);
             }
 
             return new DataLocationResolution(

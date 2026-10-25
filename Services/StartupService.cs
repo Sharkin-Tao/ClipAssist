@@ -1,5 +1,6 @@
 using System.IO;
 using System.Security;
+using ClipAssist.Localization;
 using Microsoft.Win32;
 
 namespace ClipAssist.Services;
@@ -101,7 +102,7 @@ public sealed class StartupService
         {
             return new StartupStatus(
                 StartupState.Invalid,
-                "开机启动项格式无效，关闭后重新开启可修复。");
+                "Startup.InvalidEntry");
         }
 
         var registeredPath = ExtractExecutablePath(command);
@@ -109,14 +110,14 @@ public sealed class StartupService
         {
             return new StartupStatus(
                 StartupState.Invalid,
-                "开机启动项未指向可识别的程序路径，关闭后重新开启可修复。");
+                "Startup.UnrecognizedPath");
         }
 
         if (!File.Exists(registeredPath))
         {
             return new StartupStatus(
                 StartupState.Invalid,
-                $"开机启动项指向的文件不存在：{registeredPath}。关闭后重新开启可修复。");
+                L.Format("Startup.FileMissing", registeredPath));
         }
 
         var currentPath = ResolveExecutablePath(out var pathError);
@@ -124,7 +125,7 @@ public sealed class StartupService
         {
             return new StartupStatus(
                 StartupState.Enabled,
-                $"启动项已存在，但无法确认当前程序路径：{pathError}");
+                L.Format("Startup.CurrentPathUnknown", pathError));
         }
 
         if (PathsEqual(registeredPath, currentPath))
@@ -133,12 +134,12 @@ public sealed class StartupService
                 ? new StartupStatus(StartupState.Enabled)
                 : new StartupStatus(
                     StartupState.Enabled,
-                    "开机启动项已开启，但仍是旧命令，缺少静默启动参数。关闭后重新开启可更新为后台启动。");
+                    L.Get("Startup.MissingSilentArg"));
         }
 
         return new StartupStatus(
             StartupState.Enabled,
-            $"启动项仍指向旧位置：{registeredPath}。关闭后重新开启可更新为当前程序。");
+            L.Format("Startup.OldLocation", registeredPath));
     }
 
     /// <summary>
@@ -170,7 +171,7 @@ public sealed class StartupService
                     : new StartupChangeResult(
                         false,
                         existingStatus,
-                        "启动项已存在，但回读状态不一致。");
+                        L.Get("Startup.ReadBackMismatch"));
             }
 
             stage = "write";
@@ -186,7 +187,7 @@ public sealed class StartupService
                 return new StartupChangeResult(
                     false,
                     GetStatus(),
-                    "写入开机启动项后回读不一致，已恢复原状态。");
+                    L.Get("Startup.WriteReadBackMismatch"));
             }
 
             stage = "status-after-write";
@@ -196,7 +197,7 @@ public sealed class StartupService
                 return new StartupChangeResult(
                     false,
                     status,
-                    "启动项已写入，但读取验证未通过。");
+                    L.Get("Startup.VerifyFailed"));
             }
 
             return new StartupChangeResult(true, status);
@@ -211,7 +212,7 @@ public sealed class StartupService
             return new StartupChangeResult(
                 false,
                 GetStatus(),
-                DescribeChangeFailure("开启开机自启动", ex, stage));
+                DescribeChangeFailure(L.Get("Startup.EnableAction"), ex, stage));
         }
     }
 
@@ -236,7 +237,7 @@ public sealed class StartupService
                 return new StartupChangeResult(
                     false,
                     GetStatus(),
-                    "关闭开机自启动后，启动项仍然存在。");
+                    L.Get("Startup.DisableStillExists"));
             }
 
             return new StartupChangeResult(true, new StartupStatus(StartupState.Disabled));
@@ -246,7 +247,7 @@ public sealed class StartupService
             return new StartupChangeResult(
                 false,
                 GetStatus(),
-                DescribeChangeFailure("关闭开机自启动", ex, "delete"));
+                DescribeChangeFailure(L.Get("Startup.DisableAction"), ex, "delete"));
         }
     }
 
@@ -302,14 +303,14 @@ public sealed class StartupService
 
             if (string.IsNullOrWhiteSpace(path))
             {
-                error = "无法确定 ClipAssist 的可执行文件路径。";
+                error = L.Get("Startup.ExecutableUnknown");
                 return null;
             }
 
             var fullPath = Path.GetFullPath(path);
             if (!File.Exists(fullPath))
             {
-                error = $"ClipAssist 可执行文件不存在：{fullPath}";
+                error = L.Format("Startup.ExecutableMissing", fullPath);
                 return null;
             }
 
@@ -321,7 +322,7 @@ public sealed class StartupService
                                        or SecurityException
                                        or IOException)
         {
-            error = $"无法验证 ClipAssist 可执行文件路径：{ex.Message}";
+            error = L.Format("Startup.ExecutableInvalid", ex.Message);
             return null;
         }
     }
@@ -432,12 +433,8 @@ public sealed class StartupService
 
     private static string DescribeReadFailure(Exception exception) =>
         exception is UnauthorizedAccessException or SecurityException
-            ? "无法读取开机启动项：Windows 拒绝访问"
-              + $"（错误码 0x{exception.HResult:X8}）。"
-              + "当前程序可能运行在受限终端、沙箱或低权限环境中。"
-              + "如果程序所在文件夹带有“低完整性”标签（常见于从压缩包或网络位置解压的目录），"
-              + "请将整个程序文件夹复制到普通本地目录后重新启动 ClipAssist。"
-            : $"无法读取开机启动项：{exception.Message}";
+            ? L.Format("Startup.ReadDenied", exception.HResult.ToString("X8"))
+            : L.Format("Startup.ReadFailed", exception.Message);
 
     private static string DescribeChangeFailure(
         string action,
@@ -446,23 +443,22 @@ public sealed class StartupService
     {
         if (exception is not (UnauthorizedAccessException or SecurityException))
         {
-            return $"{action}失败：{exception.Message}";
+            return L.Format("Startup.ChangeFailedAction", action, exception.Message);
         }
 
         var operation = stage switch
         {
-            "read-before-write" => "读取",
-            "read-after-write" or "status-after-write" => "验证",
-            "delete" => "删除",
-            _ => "写入",
+            "read-before-write" => L.Get("Startup.OperationRead"),
+            "read-after-write" or "status-after-write" => L.Get("Startup.OperationVerify"),
+            "delete" => L.Get("Startup.OperationDelete"),
+            _ => L.Get("Startup.OperationWrite"),
         };
 
-        return $"{action}失败：Windows 拒绝{operation}当前用户的启动项"
-            + $"（HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run，"
-            + $"错误码 0x{exception.HResult:X8}）。"
-            + "当前程序可能运行在受限终端、沙箱或低权限环境中。"
-            + "如果程序所在文件夹带有“低完整性”标签（常见于从压缩包或网络位置解压的目录），"
-            + "请将整个程序文件夹复制到普通本地目录后重新启动再试。";
+        return L.Format(
+            "Startup.ChangeDenied",
+            action,
+            operation,
+            exception.HResult.ToString("X8"));
     }
 
     private static bool IsRegistryFailure(Exception exception) =>
@@ -500,7 +496,7 @@ public sealed class StartupService
             // CreateSubKey 权限要求；只有键确实不存在时才创建。
             using var key = Registry.CurrentUser.OpenSubKey(DefaultRunKeyPath, writable: true)
                 ?? Registry.CurrentUser.CreateSubKey(DefaultRunKeyPath, writable: true)
-                ?? throw new InvalidOperationException("无法打开当前用户的开机启动项注册表位置。");
+                ?? throw new InvalidOperationException(L.Get("Startup.RegistryUnavailable"));
 
             key.SetValue(valueName, value, kind);
         }

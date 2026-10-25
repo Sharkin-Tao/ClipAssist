@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using ClipAssist.Localization;
 
 namespace ClipAssist.Infrastructure;
 
@@ -57,13 +58,13 @@ public sealed class DataLocationPointer
                 !root.TryGetProperty("dataDirectory", out var directoryElement) ||
                 directoryElement.ValueKind != JsonValueKind.String)
             {
-                return Invalid("数据目录指针格式无效，已使用默认目录；原指针文件未修改。");
+                return Invalid(L.Get("Data.PointerInvalid"));
             }
 
             var raw = directoryElement.GetString();
             if (string.IsNullOrWhiteSpace(raw) || !Path.IsPathFullyQualified(raw))
             {
-                return Invalid("数据目录指针不是绝对路径，已使用默认目录；原指针文件未修改。");
+                return Invalid(L.Get("Data.PointerNotAbsolute"));
             }
 
             var directory = Path.GetFullPath(raw.Trim());
@@ -74,18 +75,18 @@ public sealed class DataLocationPointer
         }
         catch (JsonException)
         {
-            return Invalid("数据目录指针格式损坏，已使用默认目录；原指针文件未修改。");
+            return Invalid(L.Get("Data.PointerCorrupt"));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return new DataLocationPointerReadResult(
                 DataLocationPointerStatus.Unreadable,
                 null,
-                $"读取数据目录指针失败，已使用默认目录：{ex.Message}");
+                L.Format("Data.PointerReadFailed", ex.Message));
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
-            return Invalid($"数据目录指针中的路径无效，已使用默认目录：{ex.Message}");
+            return Invalid(L.Format("Data.PointerPathInvalid", ex.Message));
         }
     }
 
@@ -98,7 +99,7 @@ public sealed class DataLocationPointer
 
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory))
         {
-            error = "数据目录必须是绝对路径，未保存。";
+            error = L.Get("Data.MustBeAbsolute");
             return false;
         }
 
@@ -109,14 +110,14 @@ public sealed class DataLocationPointer
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
-            error = $"数据目录路径无效：{ex.Message}";
+            error = L.Format("Data.InvalidPath", ex.Message);
             return false;
         }
 
         var pointerDirectory = Path.GetDirectoryName(FilePath);
         if (string.IsNullOrEmpty(pointerDirectory))
         {
-            error = "数据目录指针路径无效。";
+            error = L.Get("Data.PointerPathInvalidNoDetail");
             return false;
         }
 
@@ -151,7 +152,7 @@ public sealed class DataLocationPointer
                 !string.Equals(verify.Directory, normalized, StringComparison.OrdinalIgnoreCase))
             {
                 Restore(previous);
-                error = "数据目录指针写入后校验失败，已恢复原指针。";
+                error = L.Get("Data.PointerVerifyFailed");
                 return false;
             }
 
@@ -164,7 +165,7 @@ public sealed class DataLocationPointer
         {
             TryDelete(tempPath);
             Restore(previous);
-            error = $"保存数据目录指针失败：{ex.Message}";
+            error = L.Format("Data.PointerSaveFailed", ex.Message);
             return false;
         }
     }

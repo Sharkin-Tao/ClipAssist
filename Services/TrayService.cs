@@ -2,6 +2,7 @@ using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using System.Windows.Threading;
+using ClipAssist.Localization;
 
 namespace ClipAssist.Services;
 
@@ -16,6 +17,10 @@ public sealed class TrayService : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
     private readonly ContextMenuStrip _menu;
+    private readonly ToolStripMenuItem _openMainItem;
+    private readonly ToolStripMenuItem _openFloatingItem;
+    private readonly ToolStripMenuItem _settingsItem;
+    private readonly ToolStripMenuItem _exitItem;
     private readonly DispatcherTimer _singleClickTimer;
     private readonly Icon _icon;
     private bool _disposed;
@@ -42,17 +47,17 @@ public sealed class TrayService : IDisposable
 
     public TrayService(string? iconPath)
     {
-        var openMainItem = new ToolStripMenuItem("打开主窗口");
+        var openMainItem = new ToolStripMenuItem(L.Get("Tray.OpenMain"));
         openMainItem.Font = new Font(openMainItem.Font, FontStyle.Bold);
         openMainItem.Click += (_, _) => ShowRequested?.Invoke(this, EventArgs.Empty);
 
-        var openFloatingItem = new ToolStripMenuItem("打开浮动窗口");
+        var openFloatingItem = new ToolStripMenuItem(L.Get("Tray.OpenFloating"));
         openFloatingItem.Click += (_, _) => FloatingRequested?.Invoke(this, EventArgs.Empty);
 
-        var settingsItem = new ToolStripMenuItem("设置…");
+        var settingsItem = new ToolStripMenuItem(L.Get("Tray.Settings"));
         settingsItem.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
 
-        var exitItem = new ToolStripMenuItem("退出 ClipAssist");
+        var exitItem = new ToolStripMenuItem(L.Get("Tray.Exit"));
         exitItem.Click += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
         var menu = new ContextMenuStrip();
@@ -92,7 +97,7 @@ public sealed class TrayService : IDisposable
 
             if (!notifyIcon.Visible || notifyIcon.Icon is null)
             {
-                throw new InvalidOperationException("托盘图标未进入可见状态。");
+                throw new InvalidOperationException(L.Get("Tray.NotVisible"));
             }
         }
         catch
@@ -110,6 +115,19 @@ public sealed class TrayService : IDisposable
         _notifyIcon = notifyIcon;
         _singleClickTimer = singleClickTimer;
         _icon = icon!;
+        _openMainItem = openMainItem;
+        _openFloatingItem = openFloatingItem;
+        _settingsItem = settingsItem;
+        _exitItem = exitItem;
+    }
+
+    /// <summary>语言切换后刷新托盘菜单；tooltip 由 App 依据快捷键状态重设。</summary>
+    public void ApplyLanguage()
+    {
+        _openMainItem.Text = L.Get("Tray.OpenMain");
+        _openFloatingItem.Text = L.Get("Tray.OpenFloating");
+        _settingsItem.Text = L.Get("Tray.Settings");
+        _exitItem.Text = L.Get("Tray.Exit");
     }
 
     /// <summary>托盘悬停提示，顺便告知当前快捷键状态。</summary>
@@ -135,7 +153,7 @@ public sealed class TrayService : IDisposable
         }
 
         _backgroundHintShown = true;
-        ShowBalloon("ClipAssist 仍在运行", text);
+        ShowBalloon(L.Get("Tray.BackgroundTitle"), text);
     }
 
     private void OnMouseClick(object? sender, MouseEventArgs e)
@@ -180,11 +198,11 @@ public sealed class TrayService : IDisposable
 
         if (string.IsNullOrWhiteSpace(path))
         {
-            warning = "未指定托盘图标路径。";
+            warning = L.Get("Tray.IconPathMissing");
         }
         else if (!File.Exists(path))
         {
-            warning = $"未找到托盘图标：{path}";
+            warning = L.Format("Tray.IconNotFound", path);
         }
         else
         {
@@ -194,7 +212,7 @@ public sealed class TrayService : IDisposable
             }
             catch (Exception ex)
             {
-                warning = $"托盘图标无法加载：{path}（{ex.Message}）";
+                warning = L.Format("Tray.IconLoadFailed", path, ex.Message);
             }
         }
 
@@ -207,17 +225,17 @@ public sealed class TrayService : IDisposable
                 var extracted = Icon.ExtractAssociatedIcon(processPath);
                 if (extracted is not null)
                 {
-                    warning += " 已改用程序自带图标。";
+                    warning += " " + L.Get("Tray.IconFallbackApp");
                     return extracted;
                 }
             }
         }
         catch (Exception ex)
         {
-            warning += $" 读取程序图标失败：{ex.Message}";
+            warning += " " + L.Format("Tray.IconFallbackReadFailed", ex.Message);
         }
 
-        warning += " 已改用系统默认图标。";
+        warning += " " + L.Get("Tray.IconFallbackSystem");
         // Clone 后由 TrayService 负责释放，不能直接释放共享的 SystemIcons 对象。
         return (Icon)SystemIcons.Application.Clone();
     }

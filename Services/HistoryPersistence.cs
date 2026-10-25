@@ -1,4 +1,5 @@
 using System.Windows.Threading;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 
 namespace ClipAssist.Services;
@@ -82,7 +83,7 @@ public sealed class HistoryPersistence : IDisposable
         }
         catch (Exception ex)
         {
-            Notice?.Invoke(this, $"保存历史失败：{ex.Message}");
+            Notice?.Invoke(this, L.Format("History.SaveFailed", ex.Message));
         }
     }
 
@@ -130,12 +131,12 @@ public sealed class HistoryPersistence : IDisposable
     {
         if (_disposed)
         {
-            return new HistorySaveResult(false, "历史保存服务已释放。");
+            return new HistorySaveResult(false, L.Get("History.Disposed"));
         }
 
         if (_paused)
         {
-            return new HistorySaveResult(false, "数据目录正在迁移，暂时无法保存历史。");
+            return new HistorySaveResult(false, L.Get("History.Paused"));
         }
 
         _timer.Stop();
@@ -153,8 +154,8 @@ public sealed class HistoryPersistence : IDisposable
             }
             catch (Exception ex)
             {
-                result = new HistorySaveResult(false, $"保存历史失败：{ex.Message}");
-                Notice?.Invoke(this, result.Error ?? "保存历史失败。");
+                result = new HistorySaveResult(false, L.Format("History.SaveFailed", ex.Message));
+                Notice?.Invoke(this, result.Error ?? L.Get("History.SaveFailedGeneric"));
             }
 
             afterSave?.Invoke(result.Success);
@@ -207,7 +208,7 @@ public sealed class HistoryPersistence : IDisposable
         }
         catch (Exception ex)
         {
-            Notice?.Invoke(this, $"保存历史失败：{ex.Message}");
+            Notice?.Invoke(this, L.Format("History.SaveFailed", ex.Message));
         }
         finally
         {

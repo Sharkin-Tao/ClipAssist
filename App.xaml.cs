@@ -1,11 +1,14 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using ClipAssist.Infrastructure;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 using ClipAssist.Services;
 using ClipAssist.ViewModels;
+using ClipAssist.Views;
 
 namespace ClipAssist;
 
@@ -43,6 +46,11 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Start with the system language so every startup diagnostic can be
+        // localized. A saved preference replaces it as soon as settings load.
+        var systemLanguage = LanguagePreferenceExtensions.FromSystemCulture();
+        LocalizationService.Instance.SetLanguage(systemLanguage);
+
         _isStartupLaunch = e.Args.Any(argument =>
             string.Equals(
                 argument,
@@ -72,7 +80,7 @@ public partial class App : Application
             _singleInstance.Dispose();
             _singleInstance = null;
             MessageBox.Show(
-                $"无法检查另一个 ClipAssist 版本是否正在运行：{ex.Message}",
+                L.Format("App.CrossModeCheckFailed", ex.Message),
                 "ClipAssist",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
@@ -87,8 +95,7 @@ public partial class App : Application
             _singleInstance.Dispose();
             _singleInstance = null;
             MessageBox.Show(
-                "检测到另一个 ClipAssist 版本正在运行。\n\n"
-                + "为了避免争用全局快捷键和出现两个托盘图标，请先退出另一个版本后再启动本版本。",
+                L.Get("App.OtherVersionRunning"),
                 "ClipAssist",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
@@ -104,11 +111,21 @@ public partial class App : Application
         _storageMigrationService = new StorageMigrationService(
             new DataLocationPointer(AppPaths.GetDataLocationFilePath()));
 
-        _settingsService = new SettingsService(
-            new SettingsStore(Path.Combine(location.Directory, AppPaths.SettingsFileName)));
-        var settingsResult = _settingsService.Load();
+        var settingsPath = Path.Combine(location.Directory, AppPaths.SettingsFileName);
 
-        // 主题必须在主窗口创建前应用，避免启动时先闪一下浅色窗口。
+        // Peek at the saved language before loading so migration/validation
+        // warnings are generated in the language the user chose last time.
+        if (TryReadSavedLanguage(settingsPath, out var savedLanguage))
+        {
+            LocalizationService.Instance.SetLanguage(savedLanguage);
+        }
+
+        _settingsService = new SettingsService(new SettingsStore(settingsPath));
+        var settingsResult = _settingsService.Load();
+        string? languageNotice = null;
+
+        // Apply the saved theme before any window is created. The first-run
+        // language picker is a window too, so it must not flash light in dark mode.
         _themeService = new ThemeService();
         var savedTheme = ThemePreferenceExtensions.TryParse(
             _settingsService.Current.Theme?.Mode,
@@ -120,6 +137,38 @@ public partial class App : Application
         _themeWatcher = new SystemThemeWatcher();
         _themeWatcher.Changed += (_, _) => _themeService?.RefreshSystemTheme();
 
+        if (LanguagePreferenceExtensions.TryParse(
+                _settingsService.Current.Language?.Mode,
+                out var storedLanguage))
+        {
+            LocalizationService.Instance.SetLanguage(storedLanguage);
+        }
+        else if (!_isStartupLaunch)
+        {
+            // First run: ask before the main window exists. Closing the dialog
+            // keeps the system language and never blocks startup.
+            var picker = new LanguageSelectionWindow(systemLanguage);
+            if (picker.ShowDialog() == true)
+            {
+                LocalizationService.Instance.SetLanguage(picker.SelectedLanguage);
+                var save = _settingsService.SaveLanguage(picker.SelectedLanguage);
+                if (!save.Success)
+                {
+                    languageNotice = L.Format("App.LanguageSaveFailed", save.Error);
+                }
+            }
+            else
+            {
+                LocalizationService.Instance.SetLanguage(systemLanguage);
+            }
+        }
+        else
+        {
+            LocalizationService.Instance.SetLanguage(systemLanguage);
+        }
+
+        // 主题已在加载设置后、创建任何窗口前应用，避免启动时先闪一下浅色窗口。
+
         var storage = new ClipboardStorage(location.Directory);
         var history = new ClipboardHistory();
         var persistence = new HistoryPersistence(storage, history);
@@ -128,7 +177,7 @@ public partial class App : Application
         _clipboardService = new ClipboardService(history);
         _persistence = persistence;
 
-        var startupNotice = JoinNotices(loadWarning, settingsResult.Warning);
+        var startupNotice = JoinNotices(loadWarning, settingsResult.Warning, languageNotice);
         var dataDirectoryNotice = CreateDataDirectoryNotice(location);
         if (dataDirectoryNotice is not null)
         {
@@ -190,7 +239,7 @@ public partial class App : Application
         {
             tray?.Dispose();
             _tray = null;
-            viewModel.ShowNotice($"系统托盘初始化失败：{ex.Message} 可使用 Ctrl+Q 或关闭主窗口退出。");
+            viewModel.ShowNotice(L.Format("App.TrayInitFailed", ex.Message));
         }
 
         if (_tray?.Warning is { } trayWarning)
@@ -212,7 +261,7 @@ public partial class App : Application
         {
             hotkeyResult = new HotkeyInitializeResult(
                 null,
-                $"初始化全局快捷键失败：{ex.Message}");
+                L.Format("App.HotkeyInitFailed", ex.Message));
         }
 
         UpdateHotkeyPresentation();
@@ -220,18 +269,18 @@ public partial class App : Application
         if (hotkeyResult.Warning is not null)
         {
             viewModel.ShowNotice(JoinNotices(hotkeyResult.Warning, dataDirectoryNotice) ?? string.Empty);
-            _tray?.ShowBalloon("快捷键状态", hotkeyResult.Warning);
+            _tray?.ShowBalloon(L.Get("App.HotkeyBalloonTitle"), hotkeyResult.Warning);
         }
         else if (hotkeyResult.EffectiveGesture is not null)
         {
             viewModel.ShowNotice(JoinNotices(
-                $"全局快捷键 {hotkeyResult.EffectiveGesture.Value.DisplayText} 已生效。",
+                L.Format("App.HotkeyActive", hotkeyResult.EffectiveGesture.Value.DisplayText),
                 dataDirectoryNotice) ?? string.Empty);
         }
 
         if (dataDirectoryNotice is not null)
         {
-            _tray?.ShowBalloon("数据目录", dataDirectoryNotice);
+            _tray?.ShowBalloon(L.Get("App.DataBalloonTitle"), dataDirectoryNotice);
         }
 
         if (_showRequestedBeforeWindowReady)
@@ -343,7 +392,9 @@ public partial class App : Application
             _startupService,
             ApplyStorageFromSettingsWindow,
             ApplyHotkeyFromSettingsWindow,
-            ApplyThemeFromSettingsWindow)
+            ApplyThemeFromSettingsWindow,
+            LocalizationService.Instance.CurrentLanguage,
+            ApplyLanguageFromSettingsWindow)
         {
             Owner = _window,
         };
@@ -375,7 +426,7 @@ public partial class App : Application
     {
         if (_hotkeyManager is null)
         {
-            return new HotkeyApplyResult(false, "快捷键服务不可用。", null);
+            return new HotkeyApplyResult(false, L.Get("App.HotkeyServiceUnavailable"), null);
         }
 
         var previous = _hotkeyManager.SavedGesture;
@@ -386,11 +437,38 @@ public partial class App : Application
             UpdateHotkeyPresentation();
             _viewModel?.ShowNotice(
                 previous == result.EffectiveGesture
-                    ? "呼出焦点设置已保存。"
-                    : $"全局快捷键已更新为 {result.EffectiveGesture.Value.DisplayText}。");
+                    ? L.Get("App.FocusSaved")
+                    : L.Format("App.HotkeyUpdated", result.EffectiveGesture.Value.DisplayText));
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// 设置窗口选择语言：先写盘，成功后再切换，避免保存失败时界面与配置不一致。
+    /// </summary>
+    private LanguageApplyResult ApplyLanguageFromSettingsWindow(LanguagePreference language)
+    {
+        if (_settingsService is null)
+        {
+            return new LanguageApplyResult(false, L.Get("App.SettingsReadOnly"));
+        }
+
+        if (language == LocalizationService.Instance.CurrentLanguage)
+        {
+            return new LanguageApplyResult(true, null);
+        }
+
+        var save = _settingsService.SaveLanguage(language);
+        if (!save.Success)
+        {
+            return new LanguageApplyResult(false, save.Error);
+        }
+
+        LocalizationService.Instance.SetLanguage(language);
+        _tray?.ApplyLanguage();
+        UpdateHotkeyPresentation();
+        return new LanguageApplyResult(true, null);
     }
 
     /// <summary>
@@ -401,7 +479,7 @@ public partial class App : Application
     {
         if (_themeService is null || _settingsService is null)
         {
-            return new ThemeApplyResult(false, "主题服务不可用。");
+            return new ThemeApplyResult(false, L.Get("App.ThemeServiceUnavailable"));
         }
 
         var previous = _themeService.SelectedMode;
@@ -416,12 +494,12 @@ public partial class App : Application
             }
 
             _themeService.Apply(previous);
-            return new ThemeApplyResult(false, save.Error ?? "保存主题失败，已恢复原主题。");
+            return new ThemeApplyResult(false, save.Error ?? L.Get("App.ThemeSaveFailed"));
         }
         catch (Exception ex)
         {
             _themeService.Apply(previous);
-            return new ThemeApplyResult(false, $"切换主题失败，已恢复原主题：{ex.Message}");
+            return new ThemeApplyResult(false, L.Format("App.ThemeSwitchFailed", ex.Message));
         }
     }
 
@@ -437,12 +515,12 @@ public partial class App : Application
             _persistence is null ||
             _storageMigrationService is null)
         {
-            return new StorageMigrationResult(false, "数据存储服务不可用，未执行迁移。", null);
+            return new StorageMigrationResult(false, L.Get("App.StorageUnavailable"), null);
         }
 
         if (_storageRelocationSucceeded)
         {
-            return new StorageMigrationResult(false, "数据目录已经迁移，应用即将重启。", null);
+            return new StorageMigrationResult(false, L.Get("App.StorageAlreadyMigrated"), null);
         }
 
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
@@ -450,7 +528,7 @@ public partial class App : Application
         {
             return new StorageMigrationResult(
                 false,
-                "数据目录由 CLIPASSIST_DATA_DIR 环境变量固定，不能在此修改。",
+                L.Get("App.StorageEnvFixed"),
                 null);
         }
 
@@ -458,7 +536,7 @@ public partial class App : Application
         {
             return new StorageMigrationResult(
                 false,
-                "当前设置文件不可写或来自更高版本，未执行迁移。",
+                L.Get("App.StorageReadOnly"),
                 null);
         }
 
@@ -481,7 +559,7 @@ public partial class App : Application
                         ResumeStorageServices(clipboard, persistence);
                         return new StorageMigrationResult(
                             false,
-                            $"迁移前保存当前设置失败：{save.Error}",
+                            L.Format("App.StoragePlacementFailed", save.Error),
                             null);
                     }
                 }
@@ -503,7 +581,7 @@ public partial class App : Application
             ResumeStorageServices(clipboard, persistence);
             return new StorageMigrationResult(
                 false,
-                $"迁移数据目录失败，已保留原目录：{ex.Message}",
+                L.Format("App.StorageMigrationFailed", ex.Message),
                 null);
         }
     }
@@ -540,8 +618,8 @@ public partial class App : Application
         var gesture = _hotkeyManager?.EffectiveGesture;
 
         _tray?.SetTooltip(gesture is null
-            ? "ClipAssist — 快捷键不可用，请从托盘打开"
-            : $"ClipAssist — {gesture.Value.DisplayText} 呼出");
+            ? L.Get("App.TrayTooltipNoHotkey")
+            : L.Format("App.TrayTooltipHotkey", gesture.Value.DisplayText));
     }
 
     /// <summary>第二个实例请求显示窗口（后台线程 → UI 线程）。</summary>
@@ -603,8 +681,8 @@ public partial class App : Application
 
         var gesture = _hotkeyManager?.EffectiveGesture?.DisplayText;
         var hint = string.IsNullOrEmpty(gesture)
-            ? "双击托盘图标可以重新打开主窗口。"
-            : $"按 {gesture} 可以打开剪贴板浮窗；双击托盘图标可以重新打开主窗口。";
+            ? L.Get("App.BackgroundHintNoHotkey")
+            : L.Format("App.BackgroundHintHotkey", gesture);
 
         _tray?.ShowBackgroundHintOnce(hint);
     }
@@ -645,14 +723,50 @@ public partial class App : Application
 
         if (!result.Success && _window.IsVisible)
         {
-            _viewModel?.ShowNotice(result.Error ?? "保存窗口位置失败。");
+            _viewModel?.ShowNotice(result.Error ?? L.Get("App.SavePlacementFailed"));
+        }
+    }
+
+    private static bool TryReadSavedLanguage(string settingsPath, out LanguagePreference language)
+    {
+        language = LanguagePreference.ChineseSimplified;
+
+        try
+        {
+            if (!File.Exists(settingsPath))
+            {
+                return false;
+            }
+
+            using var document = JsonDocument.Parse(
+                File.ReadAllText(settingsPath),
+                new JsonDocumentOptions
+                {
+                    AllowTrailingCommas = true,
+                    CommentHandling = JsonCommentHandling.Skip,
+                });
+
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("language", out var languageNode) ||
+                languageNode.ValueKind != JsonValueKind.Object ||
+                !languageNode.TryGetProperty("mode", out var modeNode) ||
+                modeNode.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+
+            return LanguagePreferenceExtensions.TryParse(modeNode.GetString(), out language);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return false;
         }
     }
 
     private static string? CreateDataDirectoryNotice(DataLocationResolution location)
     {
         var fallbackNotice = location.Source == DataLocationSource.Fallback
-            ? $"默认数据目录不可写，设置与历史已改存到 {location.Directory}。"
+            ? L.Format("App.DataFallback", location.Directory)
             : null;
 
         return JoinNotices(fallbackNotice, location.Warning);

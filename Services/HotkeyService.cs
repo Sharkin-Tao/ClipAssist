@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
 using System.Windows.Interop;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 
 namespace ClipAssist.Services;
@@ -58,13 +59,13 @@ public sealed class HotkeyService : IDisposable
 
         if (!gesture.IsValid)
         {
-            LastError = "快捷键组合不合法。";
+            LastError = L.Get("Hotkey.Invalid");
             return null;
         }
 
         if (_current?.Gesture == gesture)
         {
-            LastError = $"快捷键 {gesture.DisplayText} 已经生效，无需重复注册。";
+            LastError = L.Format("Hotkey.AlreadyActive", gesture.DisplayText);
             return null;
         }
 
@@ -77,7 +78,7 @@ public sealed class HotkeyService : IDisposable
         var virtualKey = (uint)KeyInterop.VirtualKeyFromKey(gesture.Key);
         if (virtualKey == 0)
         {
-            LastError = "无法把这个按键转换为系统虚拟键。";
+            LastError = L.Get("Hotkey.ConvertFailed");
             return null;
         }
 
@@ -87,8 +88,8 @@ public sealed class HotkeyService : IDisposable
         {
             var error = Marshal.GetLastWin32Error();
             LastError = error == ErrorHotkeyAlreadyRegistered
-                ? $"快捷键 {gesture.DisplayText} 已被其他程序占用。"
-                : $"注册快捷键 {gesture.DisplayText} 失败（错误 {error}：{new Win32Exception(error).Message}）。";
+                ? L.Format("Hotkey.Conflict", gesture.DisplayText)
+                : L.Format("Hotkey.RegisterFailedDetail", gesture.DisplayText, error, new Win32Exception(error).Message);
             return null;
         }
 
@@ -109,7 +110,7 @@ public sealed class HotkeyService : IDisposable
 
         if (_pending is null || _pending.Id != registration.Id)
         {
-            throw new InvalidOperationException("没有匹配的待提交快捷键注册。");
+            throw new InvalidOperationException(L.Get("Hotkey.NoPending"));
         }
 
         if (_current is not null &&
@@ -118,7 +119,7 @@ public sealed class HotkeyService : IDisposable
             var error = Marshal.GetLastWin32Error();
             UnregisterHotKey(_source!.Handle, registration.Id);
             _pending = null;
-            LastError = $"注销旧快捷键失败（错误 {error}），已保留旧快捷键。";
+            LastError = L.Format("Hotkey.UnregisterFailed", error);
             return false;
         }
 

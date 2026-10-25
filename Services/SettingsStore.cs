@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 
 namespace ClipAssist.Services;
@@ -56,7 +57,7 @@ public sealed class SettingsStore
 
         FilePath = filePath;
         DirectoryPath = Path.GetDirectoryName(filePath)
-            ?? throw new ArgumentException("设置文件路径不包含目录。", nameof(filePath));
+            ?? throw new ArgumentException(L.Get("Settings.Store.PathInvalid"), nameof(filePath));
     }
 
     public string FilePath { get; }
@@ -88,8 +89,8 @@ public sealed class SettingsStore
         {
             var backupPath = TryBackupCurrentFile();
             var message = backupPath is null
-                ? "设置文件格式损坏，本次使用默认设置；原文件未能备份，未自动覆盖。"
-                : $"设置文件格式损坏，已备份为 {Path.GetFileName(backupPath)}，本次使用默认设置。";
+                ? L.Get("Settings.Store.Corrupt")
+                : L.Format("Settings.Store.CorruptBackup", Path.GetFileName(backupPath));
 
             return new SettingsReadResult(
                 SettingsReadStatus.Corrupt,
@@ -102,7 +103,7 @@ public sealed class SettingsStore
             return new SettingsReadResult(
                 SettingsReadStatus.Unreadable,
                 null,
-                $"读取设置文件失败：{ex.Message}");
+                L.Format("Settings.Store.ReadFailed", ex.Message));
         }
     }
 
@@ -128,12 +129,12 @@ public sealed class SettingsStore
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
             TryDeleteTempFile(tempPath);
-            return new SettingsSaveResult(false, $"保存设置失败：{ex.Message}");
+            return new SettingsSaveResult(false, L.Format("Settings.Store.SaveFailed", ex.Message));
         }
         catch (Exception ex)
         {
             TryDeleteTempFile(tempPath);
-            return new SettingsSaveResult(false, $"保存设置失败：{ex.Message}");
+            return new SettingsSaveResult(false, L.Format("Settings.Store.SaveFailed", ex.Message));
         }
     }
 

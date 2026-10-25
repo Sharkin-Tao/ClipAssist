@@ -1,4 +1,5 @@
-﻿using System.IO;
+using System.IO;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 
 namespace ClipAssist.Services;
@@ -71,14 +72,12 @@ public sealed class SettingsService
 
         if (!IsValid(placement))
         {
-            return new SettingsSaveResult(false, "窗口位置或尺寸无效，未保存设置。");
+            return new SettingsSaveResult(false, L.Get("Settings.Warning.InvalidPlacement"));
         }
 
         if (!_canPersist)
         {
-            return new SettingsSaveResult(
-                false,
-                "设置文件来自更高版本或不可读，已保留原文件，本次不覆盖。");
+            return new SettingsSaveResult(false, L.Get("Settings.Warning.ReadOnly"));
         }
 
         if (!_needsSave && SameWindow(_settings.Window, placement))
@@ -122,14 +121,12 @@ public sealed class SettingsService
     {
         if (!gesture.IsValid)
         {
-            return new SettingsSaveResult(false, "快捷键组合不合法，未保存设置。");
+            return new SettingsSaveResult(false, L.Get("Settings.Warning.HotkeyInvalidValue"));
         }
 
         if (!_canPersist)
         {
-            return new SettingsSaveResult(
-                false,
-                "设置文件来自更高版本或不可读，已保留原文件，本次不覆盖。");
+            return new SettingsSaveResult(false, L.Get("Settings.Warning.ReadOnly"));
         }
 
         var gestureText = gesture.DisplayText;
@@ -170,9 +167,7 @@ public sealed class SettingsService
     {
         if (!_canPersist)
         {
-            return new SettingsSaveResult(
-                false,
-                "设置文件来自更高版本或不可读，已保留原文件，本次不覆盖。");
+            return new SettingsSaveResult(false, L.Get("Settings.Warning.ReadOnly"));
         }
 
         var focus = _settings.Focus ??= new FocusSettings();
@@ -204,9 +199,7 @@ public sealed class SettingsService
     {
         if (!_canPersist)
         {
-            return new SettingsSaveResult(
-                false,
-                "设置文件来自更高版本或不可读，已保留原文件，本次不覆盖。");
+            return new SettingsSaveResult(false, L.Get("Settings.Warning.ReadOnly"));
         }
 
         var theme = _settings.Theme ??= new ThemeSettings();
@@ -224,6 +217,40 @@ public sealed class SettingsService
         if (!result.Success)
         {
             theme.Mode = previous;
+            _needsSave = true;
+            return result;
+        }
+
+        _needsSave = false;
+        return result;
+    }
+
+    /// <summary>
+    /// Persists the interface language without touching pending hotkey, focus,
+    /// theme, or window state. Failure restores the previous value.
+    /// </summary>
+    public SettingsSaveResult SaveLanguage(LanguagePreference language)
+    {
+        if (!_canPersist)
+        {
+            return new SettingsSaveResult(false, L.Get("Settings.Warning.ReadOnly"));
+        }
+
+        var settings = _settings.Language ??= new LanguageSettings();
+        var storageValue = language.ToStorageValue();
+
+        if (!_needsSave && string.Equals(settings.Mode, storageValue, StringComparison.Ordinal))
+        {
+            return new SettingsSaveResult(true, null);
+        }
+
+        var previous = settings.Mode;
+        settings.Mode = storageValue;
+
+        var result = _store.Save(_settings);
+        if (!result.Success)
+        {
+            settings.Mode = previous;
             _needsSave = true;
             return result;
         }
@@ -340,7 +367,7 @@ public sealed class SettingsService
                 JoinWarnings(
                     readWarning,
                     migrationWarning,
-                    "设置内容无效，且原文件未能备份，本次不覆盖原文件。"),
+                    L.Get("Settings.Warning.InvalidNoBackup")),
                 FileCreated: false,
                 Migrated: false,
                 ReadOnly: true);
@@ -355,7 +382,7 @@ public sealed class SettingsService
             JoinWarnings(
                 readWarning,
                 migrationWarning,
-                $"设置内容无效，已备份为 {Path.GetFileName(backupPath)}，本次使用默认设置。",
+                L.Format("Settings.Warning.InvalidBackedUp", Path.GetFileName(backupPath)),
                 save.Error),
             FileCreated: true,
             Migrated: false,

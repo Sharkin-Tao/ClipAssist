@@ -1,4 +1,4 @@
-﻿namespace ClipAssist.Models;
+namespace ClipAssist.Models;
 
 /// <summary>
 /// 写入 settings.json 的应用设置。
@@ -34,4 +34,9 @@ public sealed class AppSettings
     /// 外观主题。缺失时默认跟随 Windows 应用主题。
     /// </summary>
     public ThemeSettings Theme { get; set; } = new();
+
+    /// <summary>
+    /// 界面语言。Mode 为空表示用户尚未选择，首次启动时显示语言选择窗口。
+    /// </summary>
+    public LanguageSettings Language { get; set; } = new();
 }

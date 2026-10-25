@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows.Data;
 using ClipAssist.Infrastructure;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 using ClipAssist.Services;
 
@@ -32,6 +33,7 @@ public sealed class FloatingViewModel : ObservableObject
         Items.Filter = MatchesSearch;
 
         _history.Changed += OnHistoryChanged;
+        LocalizationService.Instance.LanguageChanged += OnLanguageChanged;
         RefreshView();
     }
 
@@ -85,6 +87,8 @@ public sealed class FloatingViewModel : ObservableObject
         RefreshView();
     }
 
+    private void OnLanguageChanged(object? sender, EventArgs e) => RefreshView();
+
     private void RefreshView()
     {
         Items.Refresh();
@@ -92,8 +96,6 @@ public sealed class FloatingViewModel : ObservableObject
         var total = _history.Entries.Count;
         var visible = Items.Cast<ClipboardEntry>().Count();
         IsListEmpty = visible == 0;
-        EmptyHintText = total == 0
-            ? "还没有记录。复制一段文字试试。"
-            : "没有匹配的历史记录";
+        EmptyHintText = L.Get(total == 0 ? "Main.EmptyAll" : "Main.EmptySearch");
     }
 }

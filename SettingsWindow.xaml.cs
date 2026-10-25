@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 using ClipAssist.Services;
 using Microsoft.Win32;
@@ -17,12 +18,14 @@ public partial class SettingsWindow : Window
 {
     private readonly Func<HotkeyGesture, bool, HotkeyApplyResult> _apply;
     private readonly Func<ThemePreference, ThemeApplyResult> _applyTheme;
+    private readonly Func<LanguagePreference, LanguageApplyResult> _applyLanguage;
     private readonly Func<string, Task<StorageMigrationResult>> _applyStorage;
     private readonly StartupService _startupService;
     private readonly HotkeyGesture _saved;
     private readonly HotkeyGesture? _effective;
     private HotkeyGesture _pending;
     private ThemePreference _appliedTheme;
+    private LanguagePreference _appliedLanguage;
     private string _currentDataDirectory;
     private readonly bool _storageChangeAllowed;
     private StartupStatus _startupStatus;
@@ -30,6 +33,7 @@ public partial class SettingsWindow : Window
     private bool _busy;
     private bool _storageBusy;
     private bool _initializingTheme;
+    private bool _initializingLanguage;
     private bool _initializingStartup;
     private bool _startupBusy;
 
@@ -46,7 +50,9 @@ public partial class SettingsWindow : Window
         StartupService startupService,
         Func<string, Task<StorageMigrationResult>> applyStorage,
         Func<HotkeyGesture, bool, HotkeyApplyResult> apply,
-        Func<ThemePreference, ThemeApplyResult> applyTheme)
+        Func<ThemePreference, ThemeApplyResult> applyTheme,
+        LanguagePreference currentLanguage,
+        Func<LanguagePreference, LanguageApplyResult> applyLanguage)
     {
         InitializeComponent();
 
@@ -55,9 +61,11 @@ public partial class SettingsWindow : Window
         _pending = saved;
         _apply = apply ?? throw new ArgumentNullException(nameof(apply));
         _applyTheme = applyTheme ?? throw new ArgumentNullException(nameof(applyTheme));
+        _applyLanguage = applyLanguage ?? throw new ArgumentNullException(nameof(applyLanguage));
         _applyStorage = applyStorage ?? throw new ArgumentNullException(nameof(applyStorage));
         _startupService = startupService ?? throw new ArgumentNullException(nameof(startupService));
         _appliedTheme = currentTheme;
+        _appliedLanguage = currentLanguage;
         _currentDataDirectory = dataDirectory;
         _storageChangeAllowed = storageChangeAllowed;
         _startupStatus = _startupService.GetStatus();
@@ -68,9 +76,20 @@ public partial class SettingsWindow : Window
         StoragePathBox.Text = dataDirectory;
         StoragePathBox.ToolTip = dataDirectory;
         StorageChangeButton.IsEnabled = storageChangeAllowed;
-        StorageHintText.Text = storageChangeAllowed
-            ? "更改后会复制 settings.json 和 history.json 到新目录；旧目录保留，完成后应用会重启。"
-            : "当前数据目录由环境变量固定，或设置文件不可写，无法在界面修改。";
+        StorageHintText.Text = L.Get(storageChangeAllowed
+            ? "Settings.Data.HintCopy"
+            : "Settings.Data.LockedHint");
+
+        _initializingLanguage = true;
+        LanguageSelector.ItemsSource = new[]
+        {
+            new LanguageOption(LanguagePreference.ChineseSimplified),
+            new LanguageOption(LanguagePreference.English),
+        };
+        LanguageSelector.SelectedItem = LanguageSelector.Items
+            .OfType<LanguageOption>()
+            .FirstOrDefault(option => option.Language == currentLanguage);
+        _initializingLanguage = false;
 
         _initializingTheme = true;
         ThemeSelector.ItemsSource = new[]
@@ -87,6 +106,8 @@ public partial class SettingsWindow : Window
         UpdateHeader(statusMessage);
         UpdateCaptureDisplay();
         UpdateStartupPresentation();
+
+        LocalizationService.Instance.LanguageChanged += OnLanguageChanged;
     }
 
     /// <summary>同步复选框和启动项说明；IsChecked 只由真实注册表状态驱动。</summary>
@@ -97,9 +118,100 @@ public partial class SettingsWindow : Window
         _initializingStartup = false;
 
         StartupStatusText.Text = _startupStatus.Message ?? string.Empty;
+        StartupStatusText.ToolTip = StartupStatusText.Text;
         StartupStatusText.Visibility = string.IsNullOrWhiteSpace(_startupStatus.Message)
             ? Visibility.Collapsed
             : Visibility.Visible;
+    }
+
+    private void OnLanguageSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_initializingLanguage || _busy || _storageBusy ||
+            LanguageSelector.SelectedItem is not LanguageOption option)
+        {
+            return;
+        }
+
+        if (option.Language == _appliedLanguage)
+        {
+            return;
+        }
+
+        var previous = _appliedLanguage;
+        _appliedLanguage = option.Language;
+        var result = _applyLanguage(option.Language);
+
+        if (!result.Success)
+        {
+            _appliedLanguage = previous;
+            _initializingLanguage = true;
+            LanguageSelector.SelectedItem = LanguageSelector.Items
+                .OfType<LanguageOption>()
+                .FirstOrDefault(item => item.Language == previous);
+            _initializingLanguage = false;
+
+            SetError(L.Format("Settings.Language.SaveFailed", result.Error ?? string.Empty));
+            return;
+        }
+
+        ClearError();
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        _appliedLanguage = LocalizationService.Instance.CurrentLanguage;
+
+        _initializingLanguage = true;
+        LanguageSelector.ItemsSource = new[]
+        {
+            new LanguageOption(LanguagePreference.ChineseSimplified),
+            new LanguageOption(LanguagePreference.English),
+        };
+        LanguageSelector.SelectedItem = LanguageSelector.Items
+            .OfType<LanguageOption>()
+            .FirstOrDefault(option => option.Language == _appliedLanguage);
+        _initializingLanguage = false;
+
+        _initializingTheme = true;
+        RenewThemeOptions();
+        _initializingTheme = false;
+
+        _startupStatus = _startupService.GetStatus();
+        StorageHintText.Text = L.Get(_storageChangeAllowed
+            ? "Settings.Data.HintCopy"
+            : "Settings.Data.LockedHint");
+        UpdateHeader(null);
+        RefreshHotkeyStatus();
+        UpdateCaptureDisplay();
+        UpdateStartupPresentation();
+    }
+
+    private void RefreshHotkeyStatus()
+    {
+        if (_effective is null)
+        {
+            StatusText.Text = string.Empty;
+            StatusText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        StatusText.Text = _effective.Value == _saved
+            ? L.Format("Hotkey.StatusActive", _effective.Value.DisplayText)
+            : L.Format("Hotkey.StatusFallback", _saved.DisplayText, _effective.Value.DisplayText);
+        StatusText.Visibility = Visibility.Visible;
+    }
+
+    private void RenewThemeOptions()
+    {
+        ThemeSelector.ItemsSource = new[]
+        {
+            new ThemeOption(ThemePreference.Light),
+            new ThemeOption(ThemePreference.Dark),
+            new ThemeOption(ThemePreference.System),
+        };
+        ThemeSelector.SelectedItem = ThemeSelector.Items
+            .OfType<ThemeOption>()
+            .FirstOrDefault(option => option.Mode == _appliedTheme);
     }
 
     private void OnStartupOptionChanged(object sender, RoutedEventArgs e)
@@ -129,13 +241,13 @@ public partial class SettingsWindow : Window
 
             if (!result.Success)
             {
-                SetError(result.Error ?? "更新开机启动项失败，已恢复实际状态。");
+                SetError(result.Error ?? L.Get("Settings.Startup.Failed"));
             }
         }
         catch (Exception ex)
         {
             _startupStatus = _startupService.GetStatus();
-            SetError($"更新开机启动项失败，已恢复实际状态：{ex.Message}");
+            SetError(L.Format("Settings.Startup.FailedDetail", ex.Message));
         }
         finally
         {
@@ -148,12 +260,12 @@ public partial class SettingsWindow : Window
     private void UpdateHeader(string? statusMessage)
     {
         EffectiveText.Text = _effective is null
-            ? "当前生效：未注册（仍可从托盘打开窗口）"
-            : $"当前生效：{_effective.Value.DisplayText}";
+            ? L.Get("Settings.Hotkey.NotRegisteredDetail")
+            : L.Format("Settings.Hotkey.Effective", _effective.Value.DisplayText);
 
         if (_effective is not null && _effective.Value != _saved)
         {
-            SavedText.Text = $"配置中保存：{_saved.DisplayText}（启动时不可用，未覆盖配置）";
+            SavedText.Text = L.Format("Settings.Hotkey.SavedDetail", _saved.DisplayText);
             SavedText.Visibility = Visibility.Visible;
         }
         else
@@ -209,13 +321,13 @@ public partial class SettingsWindow : Window
 
         if (text.Length == 0)
         {
-            SetError("请输入快捷键组合，例如 Ctrl+Alt+K。");
+            SetError(L.Get("Settings.Hotkey.ManualMissing"));
             return;
         }
 
         if (!HotkeyGesture.TryParse(text, out var gesture, out var error))
         {
-            SetError(error ?? "快捷键组合不合法。");
+            SetError(error ?? L.Get("Settings.Hotkey.InvalidDetail"));
             return;
         }
 
@@ -258,8 +370,8 @@ public partial class SettingsWindow : Window
         if (!HotkeyGesture.TryCreate(Keyboard.Modifiers, key, out var gesture, out var error))
         {
             e.Handled = true;
-            SetError(error ?? "这个组合不能用作全局快捷键。");
-            CaptureText.Text = "按下新的组合键…（Esc 取消）";
+            SetError(error ?? L.Get("Settings.Hotkey.CaptureBusy"));
+            CaptureText.Text = L.Get("Settings.Hotkey.RecordingPrompt");
             return;
         }
 
@@ -309,7 +421,7 @@ public partial class SettingsWindow : Window
                 .FirstOrDefault(item => item.Mode == previous);
             _initializingTheme = false;
 
-            SetError(result.Error ?? "切换主题失败，已恢复原主题。");
+            SetError(result.Error ?? L.Get("Settings.Theme.Failed"));
             return;
         }
 
@@ -325,7 +437,7 @@ public partial class SettingsWindow : Window
 
         var dialog = new OpenFolderDialog
         {
-            Title = "选择 ClipAssist 数据目录",
+            Title = L.Get("Settings.Data.PickerTitle"),
             Multiselect = false,
         };
 
@@ -342,15 +454,14 @@ public partial class SettingsWindow : Window
         var target = dialog.FolderName;
         if (SameDirectory(target, _currentDataDirectory))
         {
-            SetError("目标目录与当前数据目录相同，无需迁移。");
+            SetError(L.Get("Settings.Data.SameDirectory"));
             return;
         }
 
         var confirmation = MessageBox.Show(
             this,
-            $"将把 settings.json 和 history.json 复制到：\n{target}\n\n" +
-            "旧目录不会删除。完成后应用会自动重启；当前窗口中尚未保存的快捷键或焦点修改不会保留。\n\n是否继续？",
-            "迁移数据目录",
+            L.Format("Settings.Data.ConfirmMessage", target),
+            L.Get("Settings.Data.MigrateTitle"),
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
@@ -368,7 +479,7 @@ public partial class SettingsWindow : Window
             var result = await _applyStorage(target);
             if (!result.Success)
             {
-                SetError(result.Error ?? "迁移数据目录失败，已保留原目录。");
+                SetError(result.Error ?? L.Get("Settings.Data.MigrationFailed"));
                 return;
             }
 
@@ -376,12 +487,12 @@ public partial class SettingsWindow : Window
             _currentDataDirectory = target;
             StoragePathBox.Text = target;
             StoragePathBox.ToolTip = target;
-            StorageHintText.Text = "数据目录已迁移，应用即将重启。旧目录保留在原位置。";
+            StorageHintText.Text = L.Get("Settings.Data.MigrationDoneHint");
 
             MessageBox.Show(
                 this,
-                "数据目录迁移完成，应用即将重启。\n\n旧目录中的文件没有被删除。",
-                "迁移完成",
+                L.Get("Settings.Data.MigrationDoneMessage"),
+                L.Get("Settings.Data.MigrateDoneTitle"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
 
@@ -389,7 +500,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            SetError($"迁移数据目录失败，已保留原目录：{ex.Message}");
+            SetError(L.Format("Settings.Data.MigrationFailedDetail", ex.Message));
         }
         finally
         {
@@ -425,7 +536,7 @@ public partial class SettingsWindow : Window
 
         if (_recording)
         {
-            SetError("请先按下一个完整的快捷键组合，或按 Esc 取消录入。");
+            SetError(L.Get("Settings.Hotkey.RecordingPending"));
             return;
         }
 
@@ -436,7 +547,7 @@ public partial class SettingsWindow : Window
         {
             if (!HotkeyGesture.TryParse(manualText, out var manualGesture, out var manualError))
             {
-                SetError($"手动输入的快捷键无效：{manualError}");
+                SetError(L.Format("Settings.Hotkey.ManualInvalid", manualError));
                 return;
             }
 
@@ -453,14 +564,17 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            result = new HotkeyApplyResult(false, $"保存设置失败：{ex.Message}", _effective);
+            result = new HotkeyApplyResult(
+                false,
+                L.Format("Settings.Hotkey.SaveFailed", ex.Message),
+                _effective);
         }
 
         if (!result.Success)
         {
             _busy = false;
             SetButtonsEnabled(true);
-            SetError(result.Error ?? "注册快捷键失败，原快捷键仍然有效。");
+            SetError(result.Error ?? L.Get("Settings.Hotkey.RegisterFailed"));
             return;
         }
 
@@ -487,7 +601,7 @@ public partial class SettingsWindow : Window
     private void UpdateCaptureDisplay()
     {
         CaptureText.Text = _recording
-            ? "按下新的组合键…（Esc 取消）"
+            ? L.Get("Settings.Hotkey.RecordingPrompt")
             : _pending.DisplayText;
     }
 
@@ -515,6 +629,12 @@ public partial class SettingsWindow : Window
         StorageChangeButton.IsEnabled = enabled && _storageChangeAllowed;
         SaveButton.IsEnabled = enabled;
         CancelButton.IsEnabled = enabled;
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        LocalizationService.Instance.LanguageChanged -= OnLanguageChanged;
+        base.OnClosed(e);
     }
 
     protected override void OnClosing(CancelEventArgs e)
@@ -545,5 +665,10 @@ public partial class SettingsWindow : Window
     private sealed record ThemeOption(ThemePreference Mode)
     {
         public override string ToString() => Mode.ToDisplayName();
+    }
+
+    private sealed record LanguageOption(LanguagePreference Language)
+    {
+        public override string ToString() => Language.ToDisplayName();
     }
 }

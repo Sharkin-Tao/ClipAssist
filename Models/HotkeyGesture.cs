@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using ClipAssist.Localization;
 
 namespace ClipAssist.Models;
 
@@ -32,31 +33,31 @@ public readonly record struct HotkeyGesture(ModifierKeys Modifiers, Key Key)
 
         if (modifiers == ModifierKeys.None)
         {
-            error = "快捷键至少需要一个修饰键（Ctrl、Alt、Shift 或 Win）。";
+            error = L.Get("Hotkey.RequiresModifier");
             return false;
         }
 
         if (!IsSupportedKey(key))
         {
-            error = "这个按键不能用作全局快捷键，请换一个普通键。";
+            error = L.Get("Hotkey.UnsupportedKey");
             return false;
         }
 
         if (modifiers == ModifierKeys.Shift)
         {
-            error = "不能只使用 Shift 作为全局快捷键，Shift+A 会干扰正常输入。";
+            error = L.Get("Hotkey.ShiftOnly");
             return false;
         }
 
         if (IsReservedByWindows(modifiers, key))
         {
-            error = $"快捷键 {Format(modifiers, key)} 是 Windows 保留组合，不能注册。";
+            error = L.Format("Hotkey.Reserved", Format(modifiers, key));
             return false;
         }
 
         if (IsLetterOrDigit(key) && CountModifiers(modifiers) < 2)
         {
-            error = "字母或数字键至少需要两个修饰键，避免全局劫持 Ctrl+C、Ctrl+V 等常用操作。";
+            error = L.Get("Hotkey.NeedsTwoModifiers");
             return false;
         }
 
@@ -71,14 +72,14 @@ public readonly record struct HotkeyGesture(ModifierKeys Modifiers, Key Key)
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            error = "快捷键不能为空。";
+            error = L.Get("Hotkey.Empty");
             return false;
         }
 
         var parts = text.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2)
         {
-            error = "快捷键格式应为“修饰键+按键”，例如 Ctrl+Shift+V。";
+            error = L.Get("Hotkey.Format");
             return false;
         }
 
@@ -88,7 +89,7 @@ public readonly record struct HotkeyGesture(ModifierKeys Modifiers, Key Key)
         {
             if (!TryParseModifier(parts[index], out var modifier))
             {
-                error = $"不认识的修饰键：{parts[index]}。";
+                error = L.Format("Hotkey.UnknownModifier", parts[index]);
                 return false;
             }
 
@@ -97,7 +98,7 @@ public readonly record struct HotkeyGesture(ModifierKeys Modifiers, Key Key)
 
         if (!TryParseKey(parts[^1], out var key))
         {
-            error = $"不支持的按键：{parts[^1]}。";
+            error = L.Format("Hotkey.UnknownKeyText", parts[^1]);
             return false;
         }
 

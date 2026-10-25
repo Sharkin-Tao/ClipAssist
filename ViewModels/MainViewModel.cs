@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using ClipAssist.Infrastructure;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 using ClipAssist.Services;
 using ClipAssist.Views;
@@ -20,7 +21,7 @@ public sealed class MainViewModel : ObservableObject
 {
     private readonly ClipboardHistory _history;
     private readonly ClipboardService _clipboardService;
-    private readonly Func<string, string, bool> _confirmDelete;
+    private readonly Func<string, string, string, bool> _confirmDelete;
     private readonly Func<Action<bool>?, Task<HistorySaveResult>> _saveHistory;
     private readonly ObservableCollection<ClipboardEntry> _selectedEntries = new();
 
@@ -41,10 +42,13 @@ public sealed class MainViewModel : ObservableObject
     {
         _history = history ?? throw new ArgumentNullException(nameof(history));
         _clipboardService = clipboardService ?? throw new ArgumentNullException(nameof(clipboardService));
-        _confirmDelete = confirmDelete ?? ConfirmDeleteWithDialog;
+        _confirmDelete = confirmDelete is null
+            ? ConfirmDeleteWithDialog
+            : (title, message, _) => confirmDelete(title, message);
         _saveHistory = saveHistory ?? SaveHistoryInMemory;
 
         _history.Changed += OnHistoryChanged;
+        LocalizationService.Instance.LanguageChanged += OnLanguageChanged;
         _selectedEntries.CollectionChanged += OnSelectedEntriesChanged;
 
         // 默认视图 + 过滤谓词：搜索只影响显示，不修改历史数据。
@@ -80,19 +84,12 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>请求界面清空 ListBox 的多选集合（例如搜索条件改变或退出多选）。</summary>
     public event EventHandler? SelectionResetRequested;
 
-    private static bool ConfirmDeleteWithDialog(string title, string message)
+    private static bool ConfirmDeleteWithDialog(string title, string message, string confirmText)
     {
         var owner = Application.Current?.Windows
             .Cast<Window>()
             .FirstOrDefault(window => window.IsActive)
             ?? Application.Current?.MainWindow;
-
-        // 标题已经区分操作类型；按钮文案只在这里映射，不改动确认委托签名。
-        var confirmText = title.StartsWith("清空", StringComparison.Ordinal)
-            ? "清空历史"
-            : title.Contains("选中", StringComparison.Ordinal)
-                ? "删除选中"
-                : "删除";
 
         return ConfirmDialog.Show(owner, title, message, confirmText);
     }
@@ -163,13 +160,14 @@ public sealed class MainViewModel : ObservableObject
     public SelectionMode ListSelectionMode =>
         IsSelectionMode ? SelectionMode.Multiple : SelectionMode.Single;
 
-    public string SelectionModeButtonText => IsSelectionMode ? "退出多选" : "多选";
+    public string SelectionModeButtonText =>
+        L.Get(IsSelectionMode ? "Main.ExitSelection" : "Main.ToggleSelection");
 
     public int SelectedCount => _selectedEntries.Count;
 
     public bool HasSelection => SelectedCount > 0;
 
-    public string SelectionCountText => $"已选 {SelectedCount} 条 · 仅当前显示结果";
+    public string SelectionCountText => L.Format("Main.SelectionCount", SelectedCount);
 
     /// <summary>当前过滤后的可见记录；不包含被搜索隐藏的记录。</summary>
     public IReadOnlyList<ClipboardEntry> VisibleEntries =>
@@ -204,6 +202,13 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>搜索谓词：忽略大小写，先去掉首尾空格。</summary>
     private bool MatchesSearch(object item) =>
         item is ClipboardEntry entry && ClipboardSearchMatcher.Matches(entry, _searchText);
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(SelectionModeButtonText));
+        OnPropertyChanged(nameof(SelectionCountText));
+        RefreshView();
+    }
 
     private void OnHistoryChanged(object? sender, EventArgs e)
     {
@@ -298,19 +303,17 @@ public sealed class MainViewModel : ObservableObject
         var visible = _history.Entries.Count(entry => MatchesSearch(entry));
 
         IsListEmpty = visible == 0;
-        EmptyHintText = total == 0
-            ? "还没有记录。复制一段文字试试。"
-            : "没有匹配的历史记录";
+        EmptyHintText = L.Get(total == 0 ? "Main.EmptyAll" : "Main.EmptySearch");
 
         if (total == 0)
         {
-            StatusText = "暂无记录";
+            StatusText = L.Get("Main.StatusEmpty");
             return;
         }
 
         StatusText = string.IsNullOrWhiteSpace(_searchText)
-            ? $"共 {total} 条记录 · 上限 {_history.MaxEntries}"
-            : $"匹配 {visible} / {total} 条 · 上限 {_history.MaxEntries}";
+            ? L.Format("Main.StatusAll", total, _history.MaxEntries)
+            : L.Format("Main.StatusSearch", visible, total, _history.MaxEntries);
     }
 
     public async Task DeleteEntryAsync(ClipboardEntry? entry)
@@ -351,32 +354,43 @@ public sealed class MainViewModel : ObservableObject
 
         if (ids.Count == 0)
         {
-            StatusText = "要删除的记录已不存在。";
+            StatusText = L.Get("Main.RecordMissing");
             return;
         }
 
         var count = ids.Count;
+        string title;
+        string message;
+        string confirmText;
+
+        if (clearAll)
+        {
+            title = L.Get("Main.ClearTitle");
+            message = L.Get("Main.ClearDetail");
+            confirmText = L.Get("Main.ConfirmClear");
+        }
+        else if (batch)
+        {
+            title = L.Get("Main.DeleteSelectedTitle");
+            message = L.Format("Main.DeleteSelectedDetail", count);
+            confirmText = L.Get("Main.ConfirmDeleteSelected");
+        }
+        else
+        {
+            title = L.Get("Main.DeleteOneTitle");
+            message = L.Format("Main.DeleteOneDetail", PreviewForDialog(targets[0].Text));
+            confirmText = L.Get("Main.ConfirmDelete");
+        }
+
         bool confirmed;
 
         try
         {
-            confirmed = clearAll
-                ? _confirmDelete(
-                    "清空剪贴板历史？",
-                    "此操作将删除全部剪贴板历史记录，请确认是否继续。\n\n删除后无法恢复。")
-                : batch
-                    ? _confirmDelete(
-                        "删除选中的记录？",
-                        $"确定删除选中的 {count} 条记录吗？\n\n" +
-                        "只删除当前选中的记录，不会影响未选中的记录。\n删除后无法恢复。")
-                    : _confirmDelete(
-                        "删除这条记录？",
-                        "确认后将删除这条剪贴板历史记录。\n\n" +
-                        $"{PreviewForDialog(targets[0].Text)}\n\n删除后无法恢复。");
+            confirmed = _confirmDelete(title, message, confirmText);
         }
         catch (Exception ex)
         {
-            StatusText = $"删除确认失败：{ex.Message}";
+            StatusText = L.Format("Main.DeleteConfirmFailed", ex.Message);
             return;
         }
 
@@ -392,7 +406,7 @@ public sealed class MainViewModel : ObservableObject
         if (removed.Count == 0)
         {
             _deleteInProgress = false;
-            StatusText = "要删除的记录已不存在。";
+            StatusText = L.Get("Main.RecordMissing");
             CommandManager.InvalidateRequerySuggested();
             return;
         }
@@ -421,7 +435,7 @@ public sealed class MainViewModel : ObservableObject
                     _history.Restore(removed);
                 }
 
-                StatusText = saveResult.Error ?? "删除失败：历史记录保存失败，已恢复记录。";
+                StatusText = saveResult.Error ?? L.Get("Main.DeleteSaveFailed");
                 return;
             }
 
@@ -447,8 +461,8 @@ public sealed class MainViewModel : ObservableObject
             }
 
             StatusText = clearAll
-                ? $"已清空 {count} 条历史记录"
-                : count == 1 ? "已删除 1 条记录" : $"已删除 {count} 条记录";
+                ? L.Format("Main.ClearedDetail", count)
+                : count == 1 ? L.Get("Main.DeletedOne") : L.Format("Main.DeletedMany", count);
         }
         catch (Exception ex)
         {
@@ -458,8 +472,8 @@ public sealed class MainViewModel : ObservableObject
             }
 
             StatusText = committed
-                ? $"已删除 {count} 条记录，但界面选择状态更新失败：{ex.Message}"
-                : $"删除失败：{ex.Message}";
+                ? L.Format("Main.DeletedUiFailed", count, ex.Message)
+                : L.Format("Main.DeleteFailed", ex.Message);
         }
         finally
         {
@@ -494,7 +508,7 @@ public sealed class MainViewModel : ObservableObject
 
         if (string.IsNullOrWhiteSpace(entry.Text))
         {
-            StatusText = "复制失败：这条记录没有可复制的文本。";
+            StatusText = L.Get("Main.CopyNoText");
             return;
         }
 
@@ -505,14 +519,14 @@ public sealed class MainViewModel : ObservableObject
         {
             // 由 ClipboardService 负责“抑制自己写入造成的重复记录”。
             _clipboardService.CopyToClipboard(entry.Text);
-            StatusText = "已复制到剪贴板";
+            StatusText = L.Get("Main.CopySuccess");
         }
         catch (Exception ex)
         {
             // 先给出明确失败提示，再弹出具体原因；绝不显示“已复制”。
-            StatusText = "复制失败：剪贴板可能被其他程序占用。";
+            StatusText = L.Get("Main.CopyBusy");
             MessageBox.Show(
-                $"写入剪贴板失败：{ex.Message}",
+                L.Format("Main.CopyWriteFailed", ex.Message),
                 "ClipAssist",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);

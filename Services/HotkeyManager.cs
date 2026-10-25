@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 
 namespace ClipAssist.Services;
@@ -67,23 +68,24 @@ public sealed class HotkeyManager : IDisposable
         {
             if (!TryActivate(candidate))
             {
-                errors.Add(_service.LastError ?? $"无法注册 {candidate.DisplayText}。");
+                errors.Add(_service.LastError ?? L.Format("Hotkey.RegistrationFailedDetail", candidate.DisplayText));
                 continue;
             }
 
             if (candidate == _saved)
             {
-                StatusMessage = $"全局快捷键 {candidate.DisplayText} 已生效。";
+                StatusMessage = L.Format("Hotkey.StatusActive", candidate.DisplayText);
                 return new HotkeyInitializeResult(_effective, Warning: null);
             }
 
-            StatusMessage =
-                $"已保存的快捷键 {_saved.DisplayText} 不可用，本次改用 {candidate.DisplayText} 呼出；配置未被覆盖。";
+            StatusMessage = L.Format(
+                "Hotkey.StatusFallback",
+                _saved.DisplayText,
+                candidate.DisplayText);
             return new HotkeyInitializeResult(_effective, StatusMessage);
         }
 
-        StatusMessage =
-            $"全局快捷键不可用：{string.Join(" ", errors)} 仍可从托盘打开窗口。";
+        StatusMessage = L.Format("Hotkey.StatusUnavailable", string.Join(" ", errors));
         return new HotkeyInitializeResult(EffectiveGesture: null, StatusMessage);
     }
 
@@ -98,12 +100,12 @@ public sealed class HotkeyManager : IDisposable
     {
         if (_disposed)
         {
-            return new HotkeyApplyResult(false, "快捷键服务已释放。", _effective);
+            return new HotkeyApplyResult(false, L.Get("Hotkey.Disposed"), _effective);
         }
 
         if (!gesture.IsValid)
         {
-            return new HotkeyApplyResult(false, "快捷键组合不合法。", _effective);
+            return new HotkeyApplyResult(false, L.Get("Hotkey.Invalid"), _effective);
         }
 
         var previousSelect = _settings.Current.Focus?.SelectSearchTextOnActivate ?? true;
@@ -121,7 +123,7 @@ public sealed class HotkeyManager : IDisposable
             {
                 return new HotkeyApplyResult(
                     false,
-                    saveFocus.Error ?? "保存焦点设置失败。",
+                    saveFocus.Error ?? L.Get("Hotkey.SaveFocusFailed"),
                     _effective);
             }
 
@@ -136,12 +138,12 @@ public sealed class HotkeyManager : IDisposable
             {
                 return new HotkeyApplyResult(
                     false,
-                    saveOnly.Error ?? "保存快捷键设置失败。",
+                    saveOnly.Error ?? L.Get("Hotkey.SaveFailed"),
                     _effective);
             }
 
             _saved = gesture;
-            StatusMessage = $"全局快捷键 {gesture.DisplayText} 已生效。";
+            StatusMessage = L.Format("Hotkey.StatusActive", gesture.DisplayText);
             return new HotkeyApplyResult(true, null, _effective);
         }
 
@@ -150,7 +152,7 @@ public sealed class HotkeyManager : IDisposable
         {
             return new HotkeyApplyResult(
                 false,
-                _service.LastError ?? "注册快捷键失败。",
+                _service.LastError ?? L.Get("Hotkey.RegisterFailed"),
                 _effective);
         }
 
@@ -160,17 +162,17 @@ public sealed class HotkeyManager : IDisposable
             _service.CancelRegistration(registration);
             return new HotkeyApplyResult(
                 false,
-                save.Error ?? "保存快捷键设置失败，已保留原快捷键。",
+                save.Error ?? L.Get("Hotkey.SaveFailedKeep"),
                 _effective);
         }
 
         if (!_service.CommitRegistration(registration))
         {
-            var message = _service.LastError ?? "替换快捷键失败，已保留原快捷键。";
+            var message = _service.LastError ?? L.Get("Hotkey.ReplaceFailed");
             var rollback = _settings.SaveHotkeyAndFocus(_saved, previousSelect);
             if (!rollback.Success)
             {
-                message += $" 配置回滚失败：{rollback.Error}";
+                message += L.Format("Hotkey.RollbackFailedDetail", rollback.Error);
             }
 
             return new HotkeyApplyResult(false, message, _effective);
@@ -178,7 +180,7 @@ public sealed class HotkeyManager : IDisposable
 
         _saved = gesture;
         _effective = gesture;
-        StatusMessage = $"全局快捷键 {gesture.DisplayText} 已生效。";
+        StatusMessage = L.Format("Hotkey.StatusActive", gesture.DisplayText);
         return new HotkeyApplyResult(true, null, _effective);
     }
 

@@ -1,4 +1,5 @@
-﻿using ClipAssist.Models;
+using ClipAssist.Localization;
+using ClipAssist.Models;
 
 namespace ClipAssist.Services;
 
@@ -42,7 +43,7 @@ public static class SettingsValidator
             {
                 settings.Window = null;
                 changed = true;
-                warning = AppendWarning(warning, "窗口位置或尺寸包含无效数值，本次使用默认居中窗口。");
+                warning = AppendWarning(warning, L.Get("Settings.Warning.WindowInvalid"));
             }
         }
 
@@ -50,7 +51,7 @@ public static class SettingsValidator
         {
             settings.Hotkey = new HotkeySettings();
             changed = true;
-            warning = AppendWarning(warning, "快捷键设置缺失，已恢复默认 Ctrl+Shift+V。");
+            warning = AppendWarning(warning, L.Get("Settings.Warning.HotkeyMissing"));
         }
         else if (!HotkeyGesture.TryParse(settings.Hotkey.Gesture, out var hotkey, out var hotkeyError))
         {
@@ -58,7 +59,7 @@ public static class SettingsValidator
             changed = true;
             warning = AppendWarning(
                 warning,
-                $"快捷键设置无效，已恢复默认 Ctrl+Shift+V：{hotkeyError}");
+                L.Format("Settings.Warning.HotkeyInvalid", hotkeyError));
         }
         else if (!string.Equals(settings.Hotkey.Gesture, hotkey.DisplayText, StringComparison.Ordinal))
         {
@@ -70,24 +71,49 @@ public static class SettingsValidator
         {
             settings.Focus = new FocusSettings();
             changed = true;
-            warning = AppendWarning(warning, "焦点设置缺失，已恢复默认：呼出时全选搜索框文本。");
+            warning = AppendWarning(warning, L.Get("Settings.Warning.FocusMissing"));
         }
 
         if (settings.Theme is null)
         {
             settings.Theme = new ThemeSettings();
             changed = true;
-            warning = AppendWarning(warning, "主题设置缺失，已恢复跟随系统。");
+            warning = AppendWarning(warning, L.Get("Settings.Warning.ThemeMissing"));
         }
         else if (!ThemePreferenceExtensions.TryParse(settings.Theme.Mode, out var theme))
         {
             settings.Theme.Mode = ThemePreference.System.ToStorageValue();
             changed = true;
-            warning = AppendWarning(warning, "主题设置无效，已恢复跟随系统。");
+            warning = AppendWarning(warning, L.Get("Settings.Warning.ThemeInvalid"));
         }
         else if (!string.Equals(settings.Theme.Mode, theme.ToStorageValue(), StringComparison.Ordinal))
         {
             settings.Theme.Mode = theme.ToStorageValue();
+            changed = true;
+        }
+
+        if (settings.Language is null)
+        {
+            settings.Language = new LanguageSettings();
+            changed = true;
+        }
+        else if (!string.IsNullOrWhiteSpace(settings.Language.Mode))
+        {
+            if (!LanguagePreferenceExtensions.TryParse(settings.Language.Mode, out var language))
+            {
+                settings.Language.Mode = null;
+                changed = true;
+                warning = AppendWarning(warning, L.Get("Settings.Warning.LanguageInvalid"));
+            }
+            else if (!string.Equals(settings.Language.Mode, language.ToStorageValue(), StringComparison.Ordinal))
+            {
+                settings.Language.Mode = language.ToStorageValue();
+                changed = true;
+            }
+        }
+        else if (settings.Language.Mode is not null)
+        {
+            settings.Language.Mode = null;
             changed = true;
         }
 

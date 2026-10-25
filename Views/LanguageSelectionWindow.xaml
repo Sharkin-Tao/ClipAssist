@@ -1,0 +1,80 @@
+<Window x:Class="ClipAssist.Views.LanguageSelectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:ClipAssist.Localization"
+        Width="420"
+        SizeToContent="Height"
+        MinHeight="240"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        FontFamily="{StaticResource AppFontFamily}"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        FocusManager.FocusedElement="{Binding ElementName=ChineseOption}">
+
+    <Grid Margin="28,24,28,22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="HeadingText"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimaryBrush}"
+                   TextWrapping="Wrap"
+                   AutomationProperties.AutomationId="LanguageHeading" />
+
+        <TextBlock x:Name="PromptText"
+                   Grid.Row="1"
+                   Margin="0,8,0,0"
+                   FontSize="12"
+                   LineHeight="19"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap" />
+
+        <StackPanel Grid.Row="2" Margin="0,18,0,0">
+            <RadioButton x:Name="ChineseOption"
+                         GroupName="InterfaceLanguage"
+                         Content="简体中文"
+                         FontSize="14"
+                         Padding="8,10"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         Checked="OnLanguageChecked"
+                         AutomationProperties.AutomationId="LanguageChinese" />
+            <RadioButton x:Name="EnglishOption"
+                         GroupName="InterfaceLanguage"
+                         Content="English"
+                         FontSize="14"
+                         Padding="8,10"
+                         Margin="0,4,0,0"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         Checked="OnLanguageChecked"
+                         AutomationProperties.AutomationId="LanguageEnglish" />
+        </StackPanel>
+
+        <TextBlock x:Name="NoteText"
+                   Grid.Row="3"
+                   Margin="0,14,0,0"
+                   FontSize="11"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap" />
+
+        <Button x:Name="ConfirmButton"
+                Grid.Row="4"
+                Content="{loc:Loc Language.Confirm}"
+                HorizontalAlignment="Right"
+                MinWidth="96"
+                Margin="0,20,0,0"
+                Style="{StaticResource PrimaryButtonStyle}"
+                IsDefault="True"
+                Click="OnConfirmClick"
+                AutomationProperties.AutomationId="LanguageConfirm" />
+    </Grid>
+</Window>

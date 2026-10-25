@@ -1,5 +1,6 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 
 namespace ClipAssist.Services;
@@ -26,7 +27,7 @@ public static class SettingsMigrator
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
-            return Invalid("设置文件根节点必须是 JSON 对象。");
+            return Invalid(L.Get("Settings.Warning.RootInvalid"));
         }
 
         var version = 1;
@@ -36,7 +37,7 @@ public static class SettingsMigrator
                 !versionElement.TryGetInt32(out version) ||
                 version < 1)
             {
-                return Invalid("设置版本号无效。");
+                return Invalid(L.Get("Settings.Warning.VersionInvalid"));
             }
         }
 
@@ -46,7 +47,7 @@ public static class SettingsMigrator
                 new AppSettings(),
                 Migrated: false,
                 ReadOnly: true,
-                $"设置版本 {version} 高于当前支持的 {AppSettings.CurrentSchemaVersion}，已保留原文件并使用默认设置。");
+                L.Format("Settings.Warning.VersionNewer", version, AppSettings.CurrentSchemaVersion));
         }
 
         try
@@ -64,7 +65,7 @@ public static class SettingsMigrator
                 sanitizedNode ??= JsonNode.Parse(root.GetRawText())!.AsObject();
                 sanitizedNode.Remove("hotkey");
                 sanitized = true;
-                warnings.Add("快捷键设置格式无效，已恢复默认 Ctrl+Shift+V。");
+                warnings.Add(L.Get("Settings.Warning.HotkeyMissing"));
             }
 
             if (root.TryGetProperty("focus", out var focusElement) &&
@@ -73,7 +74,7 @@ public static class SettingsMigrator
                 sanitizedNode ??= JsonNode.Parse(root.GetRawText())!.AsObject();
                 sanitizedNode.Remove("focus");
                 sanitized = true;
-                warnings.Add("焦点设置格式无效，已恢复默认：呼出时全选搜索框文本。");
+                warnings.Add(L.Get("Settings.Warning.FocusMissing"));
             }
 
             // 主题只在格式无法反序列化时整段移除；合法对象里的未知 mode 字符串
@@ -84,7 +85,7 @@ public static class SettingsMigrator
                 sanitizedNode ??= JsonNode.Parse(root.GetRawText())!.AsObject();
                 sanitizedNode.Remove("theme");
                 sanitized = true;
-                warnings.Add("主题设置格式无效，已恢复跟随系统。");
+                warnings.Add(L.Get("Settings.Warning.ThemeInvalid"));
             }
             else if (themeElement.ValueKind == JsonValueKind.Object &&
                 themeElement.TryGetProperty("mode", out var themeModeElement) &&
@@ -93,7 +94,25 @@ public static class SettingsMigrator
                 sanitizedNode ??= JsonNode.Parse(root.GetRawText())!.AsObject();
                 sanitizedNode.Remove("theme");
                 sanitized = true;
-                warnings.Add("主题设置格式无效，已恢复跟随系统。");
+                warnings.Add(L.Get("Settings.Warning.ThemeInvalid"));
+            }
+
+            if (root.TryGetProperty("language", out var languageElement) &&
+                languageElement.ValueKind is not JsonValueKind.Object and not JsonValueKind.Null)
+            {
+                sanitizedNode ??= JsonNode.Parse(root.GetRawText())!.AsObject();
+                sanitizedNode.Remove("language");
+                sanitized = true;
+                warnings.Add(L.Get("Settings.Warning.LanguageFormat"));
+            }
+            else if (languageElement.ValueKind == JsonValueKind.Object &&
+                languageElement.TryGetProperty("mode", out var languageModeElement) &&
+                languageModeElement.ValueKind is not JsonValueKind.String and not JsonValueKind.Null)
+            {
+                sanitizedNode ??= JsonNode.Parse(root.GetRawText())!.AsObject();
+                sanitizedNode.Remove("language");
+                sanitized = true;
+                warnings.Add(L.Get("Settings.Warning.LanguageFormat"));
             }
 
             if (sanitizedNode is not null)
@@ -106,7 +125,7 @@ public static class SettingsMigrator
             var settings = rootForDeserialize.Value.Deserialize<AppSettings>(SettingsStore.JsonOptions);
             if (settings is null)
             {
-                return Invalid("设置文件内容为空。");
+                return Invalid(L.Get("Settings.Warning.ContentEmpty"));
             }
 
             settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
@@ -119,11 +138,11 @@ public static class SettingsMigrator
         }
         catch (JsonException)
         {
-            return Invalid("设置内容格式无效，无法读取已知字段。");
+            return Invalid(L.Get("Settings.Warning.FormatInvalid"));
         }
         catch (NotSupportedException)
         {
-            return Invalid("设置内容包含不支持的字段类型。");
+            return Invalid(L.Get("Settings.Warning.Unsupported"));
         }
     }
 

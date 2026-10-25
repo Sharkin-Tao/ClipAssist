@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
@@ -12,6 +13,7 @@ using System.Windows.Threading;
 using System.Xml.Linq;
 using ClipAssist.Controls;
 using ClipAssist.Infrastructure;
+using ClipAssist.Localization;
 using ClipAssist.Models;
 using ClipAssist.Services;
 using ClipAssist.Tests;
@@ -98,6 +100,7 @@ void RunTests()
     TestDataLocation();
     TestStorageMigration();
     TestSettingsStore();
+    TestLocalization();
     TestThemeSettings();
     TestSystemThemeWatcher();
     TestPlacement();
@@ -628,6 +631,127 @@ void TestStorageMigration()
         File.Exists(unrelatedFile) &&
         File.ReadAllText(unrelatedFile) == "keep-me",
         unrelatedResult.Error ?? string.Empty);
+}
+
+void TestLocalization()
+{
+    var service = LocalizationService.Instance;
+
+    try
+    {
+        service.ResetForTests(LanguagePreference.ChineseSimplified);
+
+        var chinese = service.Get("Main.Subtitle");
+        var english = service.Get(LanguagePreference.English, "Main.Subtitle");
+        Check(
+            "中英文文案不同且非空",
+            chinese.Length > 0 && english.Length > 0 && chinese != english,
+            $"{chinese} / {english}");
+
+        var incomplete = service.Keys
+            .Where(key =>
+                service.Get(LanguagePreference.ChineseSimplified, key) == key
+                || service.Get(LanguagePreference.English, key) == key)
+            .ToArray();
+        Check(
+            "所有本地化键都有中英文",
+            service.Keys.Count > 150 && incomplete.Length == 0,
+            $"keys={service.Keys.Count}, missing={string.Join(",", incomplete.Take(5))}");
+
+        var itemChanged = 0;
+        var languageChanged = 0;
+        PropertyChangedEventHandler onPropertyChanged = (_, args) =>
+        {
+            if (args.PropertyName == "Item[]")
+            {
+                itemChanged++;
+            }
+        };
+        EventHandler onLanguageChanged = (_, _) => languageChanged++;
+        service.PropertyChanged += onPropertyChanged;
+        service.LanguageChanged += onLanguageChanged;
+
+        try
+        {
+            service.SetLanguage(LanguagePreference.English);
+            Check(
+                "切换语言触发 XAML 索引器刷新",
+                service.CurrentLanguage == LanguagePreference.English
+                    && itemChanged == 1
+                    && languageChanged == 1
+                    && service.Get("Main.Subtitle") == english,
+                $"item={itemChanged}, language={languageChanged}");
+        }
+        finally
+        {
+            service.PropertyChanged -= onPropertyChanged;
+            service.LanguageChanged -= onLanguageChanged;
+        }
+
+        Check(
+            "系统语言映射",
+            LanguagePreferenceExtensions.FromSystemCulture(new System.Globalization.CultureInfo("zh-CN"))
+                == LanguagePreference.ChineseSimplified
+                && LanguagePreferenceExtensions.FromSystemCulture(new System.Globalization.CultureInfo("en-US"))
+                == LanguagePreference.English,
+            "zh-CN/en-US");
+        Check(
+            "语言存储值解析大小写不敏感",
+            LanguagePreferenceExtensions.TryParse("ZH-cn", out var parsedChinese)
+                && parsedChinese == LanguagePreference.ChineseSimplified
+                && LanguagePreferenceExtensions.TryParse("en-US", out var parsedEnglish)
+                && parsedEnglish == LanguagePreference.English,
+            "zh-CN/en-US");
+
+        var directory = Path.Combine(root, "localization");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "settings.json");
+
+        var settings = new SettingsService(new SettingsStore(path));
+        var first = settings.Load();
+        Check(
+            "首次启动没有已选语言",
+            first.Settings.Language is not null
+                && first.Settings.Language.Mode is null,
+            $"mode={first.Settings.Language?.Mode ?? "(null)"}");
+
+        var save = settings.SaveLanguage(LanguagePreference.English);
+        Check("保存语言偏好成功", save.Success, save.Error ?? string.Empty);
+        Check(
+            "语言偏好写入存储值",
+            File.ReadAllText(path).Contains("\"mode\": \"en-US\"", StringComparison.Ordinal),
+            "settings.json");
+
+        var reloaded = new SettingsService(new SettingsStore(path)).Load();
+        Check(
+            "语言偏好重新加载",
+            LanguagePreferenceExtensions.TryParse(
+                reloaded.Settings.Language?.Mode,
+                out var reloadedLanguage)
+                && reloadedLanguage == LanguagePreference.English,
+            $"mode={reloaded.Settings.Language?.Mode ?? "(null)"}");
+
+        File.WriteAllText(
+            path,
+            """
+            {
+              "schemaVersion": 3,
+              "language": { "mode": "fr-FR" },
+              "window": null
+            }
+            """);
+
+        var invalid = new SettingsService(new SettingsStore(path)).Load();
+        Check(
+            "非法语言回退为未选择并提示",
+            invalid.Settings.Language?.Mode is null
+                && !string.IsNullOrWhiteSpace(invalid.Warning),
+            invalid.Warning ?? "(null)");
+    }
+    finally
+    {
+        service.ResetForTests(LanguagePreference.ChineseSimplified);
+    }
 }
 
 void TestSettingsStore()

@@ -1,4 +1,6 @@
-﻿namespace ClipAssist.Models;
+using ClipAssist.Localization;
+
+namespace ClipAssist.Models;
 
 /// <summary>
 /// 用户选择的主题模式。System 表示跟随 Windows 的应用主题。
@@ -45,8 +47,8 @@ public static class ThemePreferenceExtensions
 
     public static string ToDisplayName(this ThemePreference mode) => mode switch
     {
-        ThemePreference.Light => "浅色",
-        ThemePreference.Dark => "深色",
-        _ => "跟随系统",
+        ThemePreference.Light => L.Get("Settings.Theme.Light"),
+        ThemePreference.Dark => L.Get("Settings.Theme.Dark"),
+        _ => L.Get("Settings.Theme.System"),
     };
 }

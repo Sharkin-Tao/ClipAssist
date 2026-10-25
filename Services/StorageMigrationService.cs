@@ -2,6 +2,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
 using ClipAssist.Infrastructure;
+using ClipAssist.Localization;
 
 namespace ClipAssist.Services;
 
@@ -54,19 +55,19 @@ public sealed class StorageMigrationService
 
         if (!Directory.Exists(source))
         {
-            return new StorageTargetValidation(false, "当前数据目录不存在，未执行迁移。", false, false);
+            return new StorageTargetValidation(false, L.Get("Storage.SourceMissing"), false, false);
         }
 
         if (string.Equals(source, target, StringComparison.OrdinalIgnoreCase))
         {
-            return new StorageTargetValidation(false, "目标目录与当前数据目录相同，无需迁移。", false, false);
+            return new StorageTargetValidation(false, L.Get("Storage.SameDirectory"), false, false);
         }
 
         if (IsSubPath(target, source))
         {
             return new StorageTargetValidation(
                 false,
-                "不能选择当前数据目录内部的子目录。",
+                L.Get("Storage.Subdirectory"),
                 false,
                 false);
         }
@@ -75,19 +76,19 @@ public sealed class StorageMigrationService
         {
             return new StorageTargetValidation(
                 false,
-                "不能选择当前数据目录的上级目录，请选择一个独立的文件夹。",
+                L.Get("Storage.ParentDirectory"),
                 false,
                 false);
         }
 
         if (!Directory.Exists(target))
         {
-            return new StorageTargetValidation(false, "目标目录不存在，请选择一个已存在的文件夹。", false, false);
+            return new StorageTargetValidation(false, L.Get("Storage.TargetMissing"), false, false);
         }
 
         if (!(WritableProbeForTests?.Invoke(target) ?? AppPaths.IsWritableDirectory(target)))
         {
-            return new StorageTargetValidation(false, "目标目录不可写，请检查权限后重试。", false, false);
+            return new StorageTargetValidation(false, L.Get("Storage.TargetNotWritable"), false, false);
         }
 
         var pointerDirectory = Path.GetDirectoryName(_pointer.FilePath);
@@ -96,7 +97,7 @@ public sealed class StorageMigrationService
         {
             return new StorageTargetValidation(
                 false,
-                "目标目录不能包含启动数据目录指针文件，请选择其他目录。",
+                L.Get("Storage.ContainsPointer"),
                 false,
                 false);
         }
@@ -106,7 +107,7 @@ public sealed class StorageMigrationService
         {
             return new StorageTargetValidation(
                 false,
-                "当前目录没有 settings.json，无法确定要迁移的配置，未执行迁移。",
+                L.Get("Storage.NoSettings"),
                 false,
                 false);
         }
@@ -136,7 +137,7 @@ public sealed class StorageMigrationService
             {
                 return new StorageTargetValidation(
                     false,
-                    $"目标目录已包含 {fileName}，为避免覆盖，未执行迁移。请选择空目录或其他目录。",
+                    L.Format("Storage.Conflict", fileName),
                     true,
                     hasHistory);
             }
@@ -190,7 +191,7 @@ public sealed class StorageMigrationService
                 CleanupCreatedFinals(createdFinals, createdHashes);
                 return new StorageMigrationResult(
                     false,
-                    pointerError ?? "保存数据目录指针失败，未切换数据目录。",
+                    pointerError ?? L.Get("Storage.PointerSaveFailed"),
                     null);
             }
 
@@ -201,7 +202,7 @@ public sealed class StorageMigrationService
             CleanupCreatedFinals(createdFinals, createdHashes);
             return new StorageMigrationResult(
                 false,
-                $"迁移数据目录失败，已保留原目录：{ex.Message}",
+                L.Format("Storage.Failed", ex.Message),
                 null);
         }
         finally
@@ -266,7 +267,7 @@ public sealed class StorageMigrationService
         var destinationHash = ComputeSha256(destinationPath);
         if (!string.Equals(sourceHash, destinationHash, StringComparison.Ordinal))
         {
-            throw new IOException($"复制后的文件校验失败：{Path.GetFileName(sourcePath)}");
+            throw new IOException(L.Format("Storage.CopyVerifyFailed", Path.GetFileName(sourcePath)));
         }
 
         return sourceHash;
@@ -280,7 +281,7 @@ public sealed class StorageMigrationService
             using var document = JsonDocument.Parse(stream);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                error = "settings.json 根节点不是对象，未执行迁移。";
+                error = L.Get("Storage.SettingsRootInvalid");
                 return false;
             }
 
@@ -289,7 +290,7 @@ public sealed class StorageMigrationService
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
-            error = $"settings.json 无法读取或格式无效，未执行迁移：{ex.Message}";
+            error = L.Format("Storage.SettingsInvalid", ex.Message);
             return false;
         }
     }
@@ -302,7 +303,7 @@ public sealed class StorageMigrationService
             var entries = JsonSerializer.Deserialize<List<StoredEntry>>(stream, HistoryJsonOptions);
             if (entries is null)
             {
-                error = "history.json 内容为空，未执行迁移。";
+                error = L.Get("Storage.HistoryEmpty");
                 return false;
             }
 
@@ -311,7 +312,7 @@ public sealed class StorageMigrationService
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
-            error = $"history.json 无法读取或格式无效，未执行迁移：{ex.Message}";
+            error = L.Format("Storage.HistoryInvalid", ex.Message);
             return false;
         }
     }
@@ -329,13 +330,13 @@ public sealed class StorageMigrationService
 
         if (string.IsNullOrWhiteSpace(directory))
         {
-            error = "数据目录不能为空。";
+            error = L.Get("Storage.Empty");
             return false;
         }
 
         if (!Path.IsPathFullyQualified(directory))
         {
-            error = "数据目录必须是绝对路径。";
+            error = L.Get("Storage.NotAbsolute");
             return false;
         }
 
@@ -346,7 +347,7 @@ public sealed class StorageMigrationService
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
-            error = $"数据目录路径无效：{ex.Message}";
+            error = L.Format("Storage.InvalidPath", ex.Message);
             return false;
         }
     }
