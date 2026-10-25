@@ -1,5 +1,4 @@
 # ClipAssist
-# ClipAssist
 
 [English](README.md) | **简体中文**
 
