@@ -11,7 +11,7 @@ ClipAssist is under active development. Features and behavior may change as the 
 ## Screenshots
 
 ![ClipAssist Main Window](smallwindows.png)
-This is Floating Window Mode
+**This is Floating Window Mode
 
 ## Features
 
