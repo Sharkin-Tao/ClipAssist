@@ -16,13 +16,19 @@ This is Floating Window Mode
 
 ## Features
 
-- **Clipboard History** — Keep track of recently copied text.
-- **Search** — Quickly find entries in clipboard history.
-- **Search Highlighting** — Highlight matching text in search results.
-- **History Management** — Delete individual entries and manage clipboard history.
-- **Floating Window** — Access clipboard history through a compact floating interface.
-- **Drag-to-Copy** — Manually drag text from the floating window to compatible external applications to copy or transfer it.
-- **Global Keyboard Shortcuts** — Access clipboard features using keyboard shortcuts.
+- **Clipboard History** — Automatically records recently copied text for convenient access and reuse.
+- **Quick Search** — Quickly search through clipboard history to locate the content you need.
+- **Search Result Highlighting** — Highlights matching text in search results for easier identification.
+- **History Management** — Delete, pin, and favorite individual history items to keep frequently used content organized.
+- **Tag Management** — Create, edit, and customize tags to categorize and organize clipboard history.
+- **Multi-Select & Bulk Actions** — Select multiple history items and perform bulk actions, including unpinning, removing favorites, and clearing tags.
+- **Floating Window Mode** — Provides a compact floating interface for quick access to clipboard history, with positioning near the current mouse pointer.
+- **Window State Synchronization** — Keeps tag, pin, and favorite states synchronized between the main window and the floating window.
+- **Drag-to-Copy** — Drag text from the floating window into compatible external applications for convenient text transfer.
+- **Global Hotkeys** — Quickly activate the floating window using global keyboard shortcuts.
+- **System Tray Support** — Minimize the application to the system tray while keeping clipboard history capture and floating window hotkey activation available.
+- **Bilingual Interface** — Supports Simplified Chinese and English, allowing users to switch interface languages.
+- **Light and Dark Themes** — Offers light and dark appearance options to suit different environments.
 
 ## Download
 
