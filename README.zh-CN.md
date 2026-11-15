@@ -1,6 +1,25 @@
+
+<div align="center">
+
 # ClipAssist
 
-[English](https://github.com/Sharkin-Tao/ClipAssist/blob/main/README.md) | **简体中文**
+### 轻量级 Windows 剪贴板历史管理工具
+
+**Copy Less. Find Faster.**
+
+<p>
+  <img src="https://img.shields.io/badge/平台-Windows%2011-0078D4?style=flat-square&logo=windows11&logoColor=white" alt="Windows 11">
+  <img src="https://img.shields.io/badge/语言-C%23-68217A?style=flat-square&logo=csharp&logoColor=white" alt="C#">
+  <img src="https://img.shields.io/badge/界面-WPF-512BD4?style=flat-square" alt="WPF">
+  <img src="https://img.shields.io/badge/框架-.NET-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET">
+</p>
+
+[English](README.md) | **简体中文**
+
+</div>
+
+---
+
 
 ClipAssist 是一款面向 Windows 11 的轻量级剪贴板历史管理工具，使用 C#、WPF 和 .NET 开发，旨在让剪贴板历史的查看、搜索和管理更加方便。
 
