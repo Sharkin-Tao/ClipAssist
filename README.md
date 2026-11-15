@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Framework-.NET-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET">
 </p>
 
-[English] | [简体中文](README.zh-CN.md)
+English | [简体中文](README.zh-CN.md)
 
 </div>
 
