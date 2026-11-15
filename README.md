@@ -1,6 +1,27 @@
+
+<div align="center">
+
 # ClipAssist
 
-**English** | [简体中文](https://github.com/Sharkin-Tao/ClipAssist/blob/main/README.zh-CN.md)
+### Lightweight Clipboard History Manager for Windows
+
+**Copy Less. Find Faster.**
+
+<p>
+  <img src="https://img.shields.io/badge/Platform-Windows%2011-0078D4?style=flat-square&logo=windows11&logoColor=white" alt="Windows 11">
+  <img src="https://img.shields.io/badge/Language-C%23-68217A?style=flat-square&logo=csharp&logoColor=white" alt="C#">
+  <img src="https://img.shields.io/badge/UI-WPF-512BD4?style=flat-square" alt="WPF">
+  <img src="https://img.shields.io/badge/Framework-.NET-512BD4?style=flat-square&logo=dotnet&logoColor=white" alt=".NET">
+</p>
+
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+</div>
+
+---
+
+
+
 
 ClipAssist is a lightweight clipboard history utility for Windows 11, built with C#, WPF, and .NET. It is designed to make accessing, searching, and managing clipboard history more convenient.
 
